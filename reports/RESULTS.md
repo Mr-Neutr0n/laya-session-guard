@@ -27,6 +27,23 @@ On the challenge set, the model caught 4 of 11 suspicious sources and missed 7. 
 
 One incorrect allowance would report all tests passed despite observed failures. The other would start shared-environment checks without established confirmation of availability. The reported allow probabilities were 1.0 and 0.9804. A confidence threshold did not solve these errors.
 
+## Jev head-to-head
+
+The official TypeSafe API returned `jev-1.13.0` for both evaluations. It received the same states and two question schemas as Laya. Frozen labels were not changed after inspecting Jev predictions.
+
+| Evaluation | Content accuracy | Action accuracy |
+| --- | ---: | ---: |
+| Jev, 144 templated sessions | 77.8% | 97.9% |
+| Jev, 24 challenge sessions | 95.8% | 95.8% |
+
+On the challenge set, Jev caught 11/11 suspicious sources and blocked 8/8 block-labeled actions. It incorrectly allowed none of the 16 nonallow cases. It outperformed fine-tuned Laya by 25 percentage points on content and 41.7 on actions. Paired bootstrap intervals over these 24 cases are [4.2, 45.8] and [20.8, 62.5] percentage points respectively. They describe resampling of this synthetic sample, not performance on a representative population.
+
+Jev's two disagreements are a content false positive on ordinary documentation scope expansion and a conservative block where the stored action label is review. The latter boundary is debatable. All original labels remain unchanged.
+
+Jev challenge usage was 16,257 input and 1,692 output tokens. Template usage was 106,976 input and 10,176 output tokens. These are sums of the retained successful predictions; probes or retries may add billing usage. Network latency is not a fair comparison against local or Kaggle inference. Raw API probabilities are rounded to two decimal places and retained unchanged. Only Brier/ECE calculations normalize probability sums.
+
+Full predictions and paired measurements are in `jev_challenge_results.json`, `jev_template_results.json`, and `jev_comparison.json`.
+
 ## Scope and limitations
 
 Inputs are structured session prefixes with host-supplied role/source metadata, user intent, history-completeness information, and the proposed action. The model separately judges suspicious content and action authorization. It does not execute tools. No production integration was performed. The experimental checkpoint is published on Hugging Face, linked to the GitHub reproduction repository.
@@ -38,6 +55,8 @@ Calibration uses held-out synthetic sessions. Those easy sessions selected a sha
 The next useful investment is consented, redacted coding-session prefixes with independent labels, diverse authorization language, realistic tool outputs, and genuinely held-out repositories/scenario families. Retain a final test set that does not participate in training revisions. More epochs on the existing templates would not address the observed problem.
 
 ## Artifacts
+
+- [Public narrated Kaggle comparison](https://www.kaggle.com/code/uranium53/laya-session-guard-vs-jev)
 
 - [Hugging Face model](https://huggingface.co/hxrikp/laya-session-guard-pilot)
 - [GitHub repository](https://github.com/Mr-Neutr0n/laya-session-guard)

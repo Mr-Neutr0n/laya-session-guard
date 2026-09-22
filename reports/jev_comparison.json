@@ -1,0 +1,251 @@
+{
+  "n_sessions": 24,
+  "synthetic_only": true,
+  "dataset_sha256": "0318e75c7ece946057745c223d83fd33ec4c16aa9e29b23fdb706561c9e2e88f",
+  "decision_policy": "Raw returned choice, no confidence threshold or wrapper",
+  "models": {
+    "base_laya": {
+      "metrics": {
+        "content": {
+          "n": 24,
+          "accuracy": 0.5416666666666666,
+          "labels": [
+            "benign",
+            "suspicious"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              13,
+              0
+            ],
+            [
+              11,
+              0
+            ]
+          ],
+          "recall": {
+            "benign": 1.0,
+            "suspicious": 0.0
+          },
+          "precision": {
+            "benign": 0.5416666666666666,
+            "suspicious": 0.0
+          },
+          "brier": 0.5210359811580436,
+          "ece": 0.10917770402040203
+        },
+        "action": {
+          "n": 24,
+          "accuracy": 0.375,
+          "labels": [
+            "allow",
+            "block",
+            "review"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              6,
+              1,
+              1
+            ],
+            [
+              6,
+              2,
+              0
+            ],
+            [
+              7,
+              0,
+              1
+            ]
+          ],
+          "recall": {
+            "allow": 0.75,
+            "block": 0.25,
+            "review": 0.125
+          },
+          "precision": {
+            "allow": 0.3157894736842105,
+            "block": 0.6666666666666666,
+            "review": 0.5
+          },
+          "brier": 0.6516535429239713,
+          "ece": 0.2595330254252053
+        }
+      },
+      "raw_nonallow_cases_incorrectly_allowed": 13
+    },
+    "finetuned_laya": {
+      "metrics": {
+        "content": {
+          "n": 24,
+          "accuracy": 0.7083333333333334,
+          "labels": [
+            "benign",
+            "suspicious"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              13,
+              0
+            ],
+            [
+              7,
+              4
+            ]
+          ],
+          "recall": {
+            "benign": 1.0,
+            "suspicious": 0.36363636363636365
+          },
+          "precision": {
+            "benign": 0.65,
+            "suspicious": 1.0
+          },
+          "brier": 0.5753314383333333,
+          "ece": 0.2896249999999999
+        },
+        "action": {
+          "n": 24,
+          "accuracy": 0.5416666666666666,
+          "labels": [
+            "allow",
+            "block",
+            "review"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              4,
+              1,
+              3
+            ],
+            [
+              1,
+              2,
+              5
+            ],
+            [
+              1,
+              0,
+              7
+            ]
+          ],
+          "recall": {
+            "allow": 0.5,
+            "block": 0.25,
+            "review": 0.875
+          },
+          "precision": {
+            "allow": 0.6666666666666666,
+            "block": 0.6666666666666666,
+            "review": 0.4666666666666667
+          },
+          "brier": 0.913328705,
+          "ece": 0.45682500000000004
+        }
+      },
+      "raw_nonallow_cases_incorrectly_allowed": 2
+    },
+    "jev": {
+      "metrics": {
+        "content": {
+          "n": 24,
+          "accuracy": 0.9583333333333334,
+          "labels": [
+            "benign",
+            "suspicious"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              12,
+              1
+            ],
+            [
+              0,
+              11
+            ]
+          ],
+          "recall": {
+            "benign": 0.9230769230769231,
+            "suspicious": 1.0
+          },
+          "precision": {
+            "benign": 1.0,
+            "suspicious": 0.9166666666666666
+          },
+          "brier": 0.09915833333333333,
+          "ece": 0.09208333333333332
+        },
+        "action": {
+          "n": 24,
+          "accuracy": 0.9583333333333334,
+          "labels": [
+            "allow",
+            "block",
+            "review"
+          ],
+          "confusion_matrix_true_rows": [
+            [
+              8,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              0
+            ],
+            [
+              0,
+              1,
+              7
+            ]
+          ],
+          "recall": {
+            "allow": 1.0,
+            "block": 1.0,
+            "review": 0.875
+          },
+          "precision": {
+            "allow": 1.0,
+            "block": 0.8888888888888888,
+            "review": 1.0
+          },
+          "brier": 0.07500833333333333,
+          "ece": 0.05749999999999997
+        }
+      },
+      "raw_nonallow_cases_incorrectly_allowed": 0
+    }
+  },
+  "paired_jev_minus_finetuned": {
+    "content": {
+      "accuracy_difference": 0.25,
+      "jev_only_correct": 7,
+      "finetuned_only_correct": 1,
+      "paired_bootstrap_95_percentile_interval": [
+        0.041666666666666664,
+        0.4583333333333333
+      ],
+      "bootstrap_seed": 42,
+      "bootstrap_samples": 10000
+    },
+    "action": {
+      "accuracy_difference": 0.4166666666666667,
+      "jev_only_correct": 10,
+      "finetuned_only_correct": 0,
+      "paired_bootstrap_95_percentile_interval": [
+        0.20833333333333334,
+        0.625
+      ],
+      "bootstrap_seed": 42,
+      "bootstrap_samples": 10000
+    }
+  },
+  "limitations": [
+    "Intervals resample only these 24 synthetic cases, not a representative real-session population",
+    "Original labels remain frozen, including a debatable block-versus-review case",
+    "API latency includes network; no fair hardware-normalized latency comparison",
+    "Probability calibration differs across models; the primary comparison is raw label correctness"
+  ]
+}

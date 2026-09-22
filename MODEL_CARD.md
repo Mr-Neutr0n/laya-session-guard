@@ -22,6 +22,8 @@ An experimental full fine-tune of English Laya for structured coding-session dec
 - [Detailed results](https://github.com/Mr-Neutr0n/laya-session-guard/blob/main/reports/RESULTS.md)
 - [Private Kaggle training notebook, owner access required](https://www.kaggle.com/code/uranium53/laya-session-guard-pilot)
 
+- [Narrated Kaggle comparison and runnable results](https://www.kaggle.com/code/uranium53/laya-session-guard-vs-jev)
+
 ## Results
 
 | Dataset | Model | Content accuracy | Action accuracy |
@@ -30,10 +32,14 @@ An experimental full fine-tune of English Laya for structured coding-session dec
 | Same templated sessions | Fine-tuned | 100% | 100% |
 | 24 separately written challenge sessions | Base Laya | 54.2% | 37.5% |
 | Same challenge sessions | Fine-tuned | 70.8% | 54.2% |
+| Same challenge sessions | Jev 1.13.0 | 95.8% | 95.8% |
+| Same templated sessions | Jev 1.13.0 | 77.8% | 97.9% |
 
 The template split shares scenario logic with training, so its perfect accuracy is not evidence of robust session understanding. On the challenge set, fine-tuning fixed seven action judgments and regressed three. Suspicious-content recall improved from 0/11 to 4/11. Block recall stayed at 2/8. Review recall improved from 1/8 to 7/8, while allow recall fell from 6/8 to 4/8. The main action gain comes from deferral.
 
 Raw incorrect allowances fell from 13/16 nonallow cases to 2/16. These are argmax model decisions. The base wrapper reviewed every case with its shipped calibration; wrapper error rates are therefore not a fair detection comparison. The two checkpoints have different calibration temperatures. Neither model was trained or calibrated on the challenge set.
+
+Jev used the same session states and question schema through the official TypeSafe API. It caught 11/11 suspicious sources and correctly blocked 8/8 block-labeled actions, with no incorrect allowances in 16 nonallow cases. This fine-tune did not outperform Jev on the challenge set. One Jev action disagreement is a debatable block-versus-review label. See the Kaggle notebook for per-case inspection.
 
 The challenge set is small and agent-authored. It does not establish real-world improvement. No multilingual or independently annotated real-session evaluation was performed.
 

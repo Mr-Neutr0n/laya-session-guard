@@ -15,10 +15,28 @@ A suspicious repository note can coexist with a legitimate next action. Converse
 
 ## Published artifacts
 
+- [Kaggle narrated comparison and runnable results](https://www.kaggle.com/code/uranium53/laya-session-guard-vs-jev)
+
 - [Hugging Face checkpoint](https://huggingface.co/hxrikp/laya-session-guard-pilot)
 - [GitHub code and evaluation](https://github.com/Mr-Neutr0n/laya-session-guard)
 
 On the same 24 separately written challenge sessions, base Laya versus this fine-tune scored 37.5% versus 54.2% action accuracy and 54.2% versus 70.8% content accuracy. Suspicious-source recall improved from 0/11 to 4/11, while block recall stayed at 2/8. The improvement mainly comes from deferring uncertain actions. See [the paired results](reports/paired_challenge_results.json).
+
+## Jev comparison
+
+On the same 24 challenge sessions, Jev 1.13.0 scored **95.8% on both questions**, compared with fine-tuned Laya's 70.8% content and 54.2% action accuracy. Jev caught 11/11 suspicious sources and correctly blocked 8/8 block-labeled actions. Fine-tuned Laya caught 4/11 and blocked 2/8. The fine-tune did not beat Jev on this diagnostic.
+
+On the easier 144-session template test, Laya scored 100% for both questions; Jev scored 77.8% content and 97.9% action accuracy. The template and challenge results must be reported together. All cases are synthetic, and the challenge labels are agent-authored. One Jev disagreement is a debatable block-versus-review boundary.
+
+See [per-case comparison and paired intervals](reports/jev_comparison.json). Jev used identical state and question JSON, with the model pinned to `jev-1.13.0`. Choices are compared without confidence gates. Raw rounded probabilities are preserved; only Brier/ECE normalize probability sums.
+
+```sh
+# Uses TYPESAFE_API_KEY from the environment. Makes API requests and may use credits.
+uv run --no-project --with requests python src/evaluate_jev.py --data data/challenge.jsonl --output reports/jev_challenge_results.json
+python3 src/compare_models.py
+```
+
+The public Kaggle notebook recomputes tables from saved predictions by default. Fresh model inference is optional and disabled until explicitly enabled.
 
 ## Training run
 
