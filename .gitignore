@@ -1,0 +1,8 @@
+__pycache__/
+.venv/
+outputs/
+*.safetensors
+references/
+reports/remote/
+*.log
+.DS_Store

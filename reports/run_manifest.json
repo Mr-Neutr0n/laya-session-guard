@@ -1,0 +1,43 @@
+{
+  "kernel": "uranium53/laya-session-guard-pilot",
+  "version": 2,
+  "status": "completed_and_verified",
+  "private": true,
+  "timeout_seconds": 3600,
+  "source_sha256": {
+    "src/train.py": "a5b0fed924b6755c00402cb6f74e2494ce23e4fc6f51d63254266a3c1e469de6",
+    "src/session_data.py": "ebe2c6703c5df8a7ea48378d96add8b378a4ddb8855e1b34498eb8da40923fa5",
+    "src/predict.py": "3dc6dceb1f80206f0dca835741bde2bd4b06e4cf19d4c22f25c3cac046fa3c1f",
+    "src/context.py": "0f58fdeab0f7357d7a4765ce2bfe91d327848f350c39960d73b020cc1ad5de78",
+    "kaggle/session_guard.ipynb": "87f692bf5c5fa9812c206dccfe49cf595705b2f528dc35738ea31775d92023b9"
+  },
+  "local_validation": {
+    "tests_passed": 14,
+    "tokenized_question_session_pairs": 1440,
+    "maximum_tokens": 379,
+    "context_budget": 1024
+  },
+  "training_seconds": 301.7131950855255,
+  "gpu": "Tesla T4",
+  "reported_test_accuracy": {
+    "content": 1.0,
+    "action": 1.0
+  },
+  "long_context_check": {
+    "events": 103,
+    "windows": 4,
+    "events_preserved": true,
+    "oversized_event_rejected": true
+  },
+  "model_bytes": 842609220,
+  "model_sha256": "4b37300ec9cce20d00f84f23af25c2793535612e6ec80e8cdc348357ad08d9d3",
+  "challenge_report": "reports/challenge_results.json",
+  "challenge": {
+    "sessions": 24,
+    "content_accuracy": 0.7083333333333334,
+    "suspicious_recall": 0.36363636363636365,
+    "action_accuracy": 0.5416666666666666,
+    "incorrect_allow_decisions": 2
+  },
+  "deployment_recommendation": "Do not use this checkpoint for automatic tool authorization"
+}

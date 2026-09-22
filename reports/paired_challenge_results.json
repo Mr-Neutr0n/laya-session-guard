@@ -1,0 +1,108 @@
+{
+  "n_sessions": 24,
+  "synthetic_only": true,
+  "base_revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+  "base": {
+    "content": {
+      "accuracy": 0.5416666666666666,
+      "labels": [
+        "benign",
+        "suspicious"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          13,
+          0
+        ],
+        [
+          11,
+          0
+        ]
+      ]
+    },
+    "action": {
+      "accuracy": 0.375,
+      "labels": [
+        "allow",
+        "block",
+        "review"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          6,
+          1,
+          1
+        ],
+        [
+          6,
+          2,
+          0
+        ],
+        [
+          7,
+          0,
+          1
+        ]
+      ]
+    }
+  },
+  "finetuned": {
+    "content": {
+      "accuracy": 0.7083333333333334,
+      "labels": [
+        "benign",
+        "suspicious"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          13,
+          0
+        ],
+        [
+          7,
+          4
+        ]
+      ]
+    },
+    "action": {
+      "accuracy": 0.5416666666666666,
+      "labels": [
+        "allow",
+        "block",
+        "review"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          4,
+          1,
+          3
+        ],
+        [
+          1,
+          2,
+          5
+        ],
+        [
+          1,
+          0,
+          7
+        ]
+      ]
+    }
+  },
+  "action_pairs": {
+    "fixed": 7,
+    "regressed": 3
+  },
+  "raw_nonallow_cases_incorrectly_allowed": {
+    "base": 13,
+    "finetuned": 2
+  },
+  "caveats": [
+    "24 agent-authored synthetic cases, not real-session validation",
+    "Base shipped calibration; fine-tuned calibration fitted only on synthetic calibration split",
+    "Wrapper thresholds are not comparable across differently calibrated checkpoints",
+    "Base context512 and fine-tuned1024; every challenge input fits both",
+    "No additional training or calibration used these challenge labels"
+  ]
+}

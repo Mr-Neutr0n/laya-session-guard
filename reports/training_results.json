@@ -1,0 +1,249 @@
+{
+  "status": "completed",
+  "synthetic_only": true,
+  "seed": 42,
+  "model_revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+  "gpu": "Tesla T4",
+  "training_seconds": 301.7131950855255,
+  "history": [
+    {
+      "epoch": 1,
+      "loss": 0.14562472467669682
+    },
+    {
+      "epoch": 2,
+      "loss": 6.556655759985356e-06
+    },
+    {
+      "epoch": 3,
+      "loss": 2.120420702385791e-06
+    }
+  ],
+  "split_sizes": {
+    "train": 480,
+    "calibration": 96,
+    "test": 144
+  },
+  "temperatures": {
+    "content": 0.5,
+    "action": 0.5
+  },
+  "baseline_temperatures": {
+    "content": 1.8250000476837158,
+    "action": 1.125
+  },
+  "baseline": {
+    "content": {
+      "n": 144,
+      "accuracy": 0.5,
+      "ece": 0.19176989379856318,
+      "brier": 0.48240006117518786,
+      "labels": [
+        "benign",
+        "suspicious"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          69,
+          3
+        ],
+        [
+          69,
+          3
+        ]
+      ],
+      "recall": {
+        "benign": 0.9583333333333334,
+        "suspicious": 0.041666666666666664
+      },
+      "precision": {
+        "benign": 0.5,
+        "suspicious": 0.5
+      },
+      "benign_false_positive_rate": 0.041666666666666664
+    },
+    "action": {
+      "n": 144,
+      "accuracy": 0.4930555555555556,
+      "ece": 0.10693646656970182,
+      "brier": 0.5937368225298427,
+      "labels": [
+        "allow",
+        "block",
+        "review"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          32,
+          0,
+          16
+        ],
+        [
+          5,
+          37,
+          6
+        ],
+        [
+          38,
+          8,
+          2
+        ]
+      ],
+      "recall": {
+        "allow": 0.6666666666666666,
+        "block": 0.7708333333333334,
+        "review": 0.041666666666666664
+      },
+      "precision": {
+        "allow": 0.4266666666666667,
+        "block": 0.8222222222222222,
+        "review": 0.08333333333333333
+      }
+    }
+  },
+  "finetuned": {
+    "content": {
+      "n": 144,
+      "accuracy": 1.0,
+      "ece": 0.0,
+      "brier": 2.200857693310985e-15,
+      "labels": [
+        "benign",
+        "suspicious"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          72,
+          0
+        ],
+        [
+          0,
+          72
+        ]
+      ],
+      "recall": {
+        "benign": 1.0,
+        "suspicious": 1.0
+      },
+      "precision": {
+        "benign": 1.0,
+        "suspicious": 1.0
+      },
+      "benign_false_positive_rate": 0.0
+    },
+    "action": {
+      "n": 144,
+      "accuracy": 1.0,
+      "ece": 0.0,
+      "brier": 1.7266301494541845e-16,
+      "labels": [
+        "allow",
+        "block",
+        "review"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          48,
+          0,
+          0
+        ],
+        [
+          0,
+          48,
+          0
+        ],
+        [
+          0,
+          0,
+          48
+        ]
+      ],
+      "recall": {
+        "allow": 1.0,
+        "block": 1.0,
+        "review": 1.0
+      },
+      "precision": {
+        "allow": 1.0,
+        "block": 1.0,
+        "review": 1.0
+      }
+    }
+  },
+  "finetuned_uncalibrated": {
+    "content": {
+      "n": 144,
+      "accuracy": 1.0,
+      "ece": 1.4424324035644531e-05,
+      "brier": 8.312796570557447e-09,
+      "labels": [
+        "benign",
+        "suspicious"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          72,
+          0
+        ],
+        [
+          0,
+          72
+        ]
+      ],
+      "recall": {
+        "benign": 1.0,
+        "suspicious": 1.0
+      },
+      "precision": {
+        "benign": 1.0,
+        "suspicious": 1.0
+      },
+      "benign_false_positive_rate": 0.0
+    },
+    "action": {
+      "n": 144,
+      "accuracy": 1.0,
+      "ece": 3.3974647521972656e-06,
+      "brier": 1.6741230219899366e-09,
+      "labels": [
+        "allow",
+        "block",
+        "review"
+      ],
+      "confusion_matrix_true_rows": [
+        [
+          48,
+          0,
+          0
+        ],
+        [
+          0,
+          48,
+          0
+        ],
+        [
+          0,
+          0,
+          48
+        ]
+      ],
+      "recall": {
+        "allow": 1.0,
+        "block": 1.0,
+        "review": 1.0
+      },
+      "precision": {
+        "allow": 1.0,
+        "block": 1.0,
+        "review": 1.0
+      }
+    }
+  },
+  "limitations": [
+    "Synthetic template labels; no real session validation",
+    "English only",
+    "No production authorization claim",
+    "Single seed",
+    "Long sessions require review when partitioned"
+  ]
+}
