@@ -32,3 +32,7 @@ PYTHONPATH=. .venv/bin/python scripts/setup_wikirace_models.py
 ```
 
 The source archive, Kaggle dataset copy, and checkpoints are ignored by Git. The derived graph, decision splits, race list, provenance, code, and notebook are in the repository.
+
+## Verify a published run locally
+
+`scripts/race_eval.py` replays all 60 held-out races through the app's own server on CPU and compares the result with the recorded Kaggle traces. It reproduced every recorded outcome and hop count: base 13 of 60 wins, fine-tuned 23 of 60, 60 of 60 outcome agreement, and 60 of 60 identical hop counts for both checkpoints. The weights are the same; the serving path is not, since Kaggle measured the same forward pass inside the training script on a Tesla T4 while this replays it through `app/server.py` on CPU. Local per-move inference is roughly 420 ms, so a full replay takes about ten minutes.
