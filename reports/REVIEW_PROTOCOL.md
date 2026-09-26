@@ -511,7 +511,62 @@ Publication rules:
   credentials. Synthetic data is labelled synthetic everywhere it appears, via `data_origin`.
 - Publishing requires a separate explicit instruction, as it did for the previous two releases.
 
-### 10.7 Amendments
+### 10.7 Expected transfer from the synthetic stopgap: do not assume any
+
+Measured by `python3 scripts/compare_s6_s7_fidelity.py` against the real adapted cases. The
+numbers below are divergences, not scores.
+
+| Axis | S6 stopgap | Real ASPI | Real Mode 1 failures | Divergence |
+| --- | --- | --- | --- | --- |
+| Mean text length (chars) | 295 | 841 | 839 | **0.35x**, 65% shorter |
+| Distinct words | 152 | 1,592 | 254 | 17% of the real vocabulary |
+| Jaccard vocabulary | 0.075 vs ASPI | — | 0.208 vs Mode 1 | low overlap on both |
+| S6 token mass unseen in the target | — | 10.9% unseen in ASPI | **38.2% unseen in Mode 1** | over a third never occurs in the failure cases |
+| Action-verb overlap | — | email 772, send 400, delete 96, create 92 | — | **only 8% of S6 verb mass uses a verb ASPI also uses** |
+| Recipient class | 8 structured destinations | **1 constant, no recipient field at all** | — | structural, not distributional |
+| Politeness markers | 72% | 96% | 100% | S6 reads less polite than the real cases |
+| Dates and named entities | **0%** | 92% | 52% | real cases are dense with dates, addresses, and IDs |
+| Injection wording | 0% | 2% | 0% | **aligns**, and intentionally so |
+| Structured permission field | **64 of 64** | **0 of 2,720** | 0 | **decisive divergence** |
+
+**Verdict: a model trained on these pairs should not be expected to transfer to the frozen
+splits, and the stopgap does not justify a training run on its own.** Three things drive that.
+
+1. **The schema differs, so it is a different task rather than a harder one.** Every stopgap case
+   carries `state.permission` with `granted`, `scope`, `revoked`, and `source`. Not one of the
+   2,720 adapted cases has it; the only authorization signal in the frozen splits is the user's
+   task text. Training on the stopgap teaches a model to read a field that is absent at
+   evaluation, so its learned rule does not apply to what it is scored on.
+2. **Surface statistics are far off.** S6 is 65% shorter, shares a vocabulary Jaccard of 0.075
+   with ASPI, and 38.2% of its token mass never occurs in the 23 failure cases it was built to
+   target. Over a third of the training signal is vocabulary the model will not meet.
+3. **Entity density is inverted.** The real cases are 92% dense in dates, addresses, and IDs and
+   the failures are 52%; the stopgap is 0%. An authorization rule learned over prose with no
+   entities is being asked to generalise to prose that is mostly entity strings.
+
+The two axes that do align are the ones the stopgap was designed for: it names a recipient set in
+64 of 64 cases against 23 of 23 in the failures, and it carries injection wording in 0% against
+0% in the failures. Those two agreements are what make it a precise specification of the Mode 1
+shape, and they are also what make it a **specification for the human collector rather than
+training data**: the 11 shapes and the recipient-expansion mechanism are what a person should be
+asked to reproduce with real sessions.
+
+Accordingly:
+
+- **Do not run a fine-tune whose justification is "we added the S6/S7 pairs."** The pre-registered
+  primary configuration already contributes zero synthetic rows, and §10.7 is the reason: the
+  measurement says the rows would not transfer even if they were added.
+- The diagnostic configuration recorded in §10.1 remains a reasonable *one-off* probe, but it
+  must be reported as a probe of the stopgap's own held-out portion, never as evidence about the
+  frozen ASPI splits, and never pooled with the primary number.
+- The stopgap's durable value is as a regression fixture for the generator and the validator, and
+  as the shape specification the human-review protocol in §3 already encodes. Keep it for those,
+  and do not spend a GPU run on it.
+- If a future measurement shows the permission field being added to the real adapter, this verdict
+  should be re-measured rather than assumed. The script exists so that re-measurement is one
+  command.
+
+### 10.8 Amendments
 
 None yet. Any change to this section before the run is appended here with its reason and its
 date, so the pre-registration is auditable rather than retroactively convenient.

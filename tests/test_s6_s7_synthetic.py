@@ -280,5 +280,80 @@ class PreRegistrationTests(unittest.TestCase):
             self.assertIn(criterion, self.doc, f"criterion text drifted: {criterion}")
 
 
+class FidelityTests(unittest.TestCase):
+    """The transfer verdict in the pre-registration must match the measurement."""
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import compare_s6_s7_fidelity as fidelity
+        cls.fidelity = fidelity
+        cls.s6 = [c for c in cases() if c["stratum"] == "S6"]
+        cls.aspi = fidelity.load_aspi()
+        cls.aspi_block = [c for c in cls.aspi if c["labels"]["action"] == "block"]
+        cls.mode1 = fidelity.load_mode1()
+        cls.doc = " ".join((ROOT / "reports" / "REVIEW_PROTOCOL.md").read_text().split())
+
+    def setUp(self):
+        if not self.aspi:
+            self.skipTest("real ASPI artifacts unavailable")
+
+    def test_mode1_loader_finds_the_documented_23(self):
+        """Guards the loader that once read content rows and silently returned nothing."""
+        self.assertEqual(len(self.mode1), 23)
+
+    def test_permission_field_divergence_is_as_documented(self):
+        with_permission = sum(1 for c in self.s6 if c["state"].get("permission"))
+        without = sum(1 for c in self.aspi if c["state"].get("permission"))
+        self.assertEqual(with_permission, len(self.s6))
+        self.assertEqual(without, 0)
+        self.assertIn("64 of 64", self.doc)
+        self.assertIn("0 of 2,720", self.doc)
+
+    def test_length_divergence_is_as_documented(self):
+        import statistics
+        s6_mean = statistics.mean(len(self.fidelity.case_text(c)) for c in self.s6)
+        aspi_mean = statistics.mean(len(self.fidelity.case_text(c)) for c in self.aspi)
+        self.assertAlmostEqual(s6_mean / aspi_mean, 0.35, places=2)
+        self.assertIn("0.35x", self.doc)
+
+    def test_entity_density_inversion_is_as_documented(self):
+        def density(rows):
+            return sum(1 for c in rows
+                       if self.fidelity.DATE_OR_ENTITY.search(self.fidelity.case_text(c))) / len(rows)
+        self.assertEqual(density(self.s6), 0.0)
+        self.assertGreater(density(self.aspi), 0.9)
+        self.assertIn("92%", self.doc)
+
+    def test_vocabulary_overlap_is_as_documented(self):
+        s6 = set()
+        for case in self.s6:
+            s6.update(set(self.fidelity.words(self.fidelity.case_text(case))))
+        aspi = set()
+        for case in self.mode1:
+            aspi.update(set(self.fidelity.words(self.fidelity.case_text(case))))
+        self.assertAlmostEqual(self.fidelity.jaccard(s6, aspi), 0.21, delta=0.05)
+        self.assertIn("0.208 vs Mode 1", self.doc)
+
+    def test_the_two_aligning_axes_are_still_true(self):
+        """If these stop holding the shape coverage argument is void, so flag it."""
+        def names_recipients(rows):
+            return sum(1 for c in rows
+                       if self.fidelity.RECIPIENT_WORDS.search(
+                           c["state"]["proposed_action"]["description"]))
+        self.assertEqual(names_recipients(self.s6), len(self.s6))
+        self.assertEqual(names_recipients(self.mode1), len(self.mode1))
+        self.assertEqual(names_recipients(self.aspi_block), 772)
+
+    def test_verdict_is_recorded_as_do_not_run(self):
+        self.assertIn("should not be expected to transfer", self.doc)
+        self.assertIn("does not justify a training run", self.doc)
+        self.assertIn("Do not run a fine-tune whose justification", self.doc)
+
+    def test_amendments_section_still_exists_and_is_empty(self):
+        self.assertIn("### 10.8 Amendments", self.doc)
+        self.assertIn("None yet", self.doc)
+
+
 if __name__ == "__main__":
     unittest.main()
