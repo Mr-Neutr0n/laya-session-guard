@@ -52,6 +52,41 @@ Calibration uses separate sessions and separate temperatures for the two questio
 
 **These are synthetic prototype metrics.** All splits share scenario logic and differ in phrasing, project names, and group identifiers. This is not a held-out attack-family benchmark, and random project-number variation does not create independent semantic examples. Strong scores would establish that the model learned this fixture distribution, not that it protects a real coding agent.
 
+## arXiv metadata topic router
+
+A second, independent experiment turns Laya into an eight-way arXiv topic router
+and fine-tunes it on metadata only. No paper full text is read: the builder
+projects `paper_id`, `title`, `abstract`, `primary_category`, `license` and
+`first_version_date` out of the `metadata` Parquet config of
+[`secemp9/arxiv-complete`](https://huggingface.co/datasets/secemp9/arxiv-complete)
+over HTTP range reads, at a pinned revision. The 16.08 TB repository is never
+cloned and no full-text config is opened.
+
+```sh
+.venv/bin/python src/arxiv_router_data.py --output-dir data/router
+ROUTER_THREADS=10 .venv/bin/python src/router_run.py all --epochs 2 --encoder-layers 2
+.venv/bin/python src/router_recompute.py reports/router_results.json
+python3 scripts/render_router_report.py
+```
+
+Base and fine-tuned checkpoints are scored on the same 800-paper held-out split with
+per-class precision, recall and F1, macro F1, accuracy, bootstrap intervals, a paired
+McNemar test and batch-1 and batch-8 latency. Trained on CPU only, with no paid service.
+
+| metric | base Laya | fine-tuned |
+| --- | --- | --- |
+| accuracy | 0.4650 | 0.6288 |
+| macro F1 | 0.3846 | 0.6215 |
+| ECE | 0.0584 | 0.0436 |
+| Brier | 0.6846 | 0.4749 |
+
+McNemar exact p = 7.7e-22 over 199 discordant held-out items. Chance is 0.125. Training
+stopped on a 7,200-second wall-clock budget inside epoch 2, so the checkpoint is a
+partial-schedule artefact, not a converged run. See
+[the write-up](reports/ARXIV_ROUTER.md) and [the raw report](reports/router_results.json),
+and rerun the tables from the stored logits with
+`.venv/bin/python src/router_recompute.py reports/router_results.json`.
+
 ## Reproduce
 
 ```sh

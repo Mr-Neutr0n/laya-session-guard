@@ -6,3 +6,6 @@ references/
 reports/remote/
 *.log
 .DS_Store
+data/router/
+kaggle/arxiv_router.ipynb
+kaggle/kernel-metadata.router.json
