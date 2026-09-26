@@ -17,10 +17,11 @@ def terms(title):
     return set(re.findall(r"[a-z0-9]+", title.lower())) - {"the", "of", "and", "in", "a"}
 
 
-def shortlist(graph, current, target, limit=12):
+def shortlist(graph, current, target, limit=12, exclude=()):
     """Rank only legal outgoing links, without consulting distance to target."""
     titles, links = graph["titles"], graph["links"]
-    available = links[current]
+    excluded = set(exclude)
+    available = [v for v in links[current] if v not in excluded]
     if target in available:
         selected = [target] + [v for v in available if v != target][:limit - 1]
         return sorted(selected, key=lambda v: hashlib.sha256(f"{current}:{target}:{v}".encode()).digest())

@@ -103,15 +103,21 @@ class Handler(BaseHTTPRequestHandler):
             current, target = request["current"], request["target"]
             visited = request.get("visited", [])
             name = request["model"]
+            mode = request.get("mode", "benchmark")
             if (type(current) is not int or type(target) is not int or
                     not 0 <= current < count or not 0 <= target < count or
                     not isinstance(visited, list) or len(visited) > 32 or
                     any(type(v) is not int or not 0 <= v < count for v in visited) or
-                    name not in ("base", "tuned")):
+                    name not in ("base", "tuned") or mode not in ("benchmark", "explore") or
+                    (mode == "explore" and (not visited or visited[-1] != current or
+                                            len(visited) != len(set(visited)) or len(visited) > 16))):
                 raise ValueError("Invalid race state")
-            options = shortlist(graph, current, target)
+            options = shortlist(graph, current, target,
+                                exclude=visited if mode == "explore" else ())
             if not options:
-                self.json_response(200, {"outcome": "dead_end", "candidates": []})
+                self.json_response(200, {"outcome": "dead_end", "candidates": [],
+                                         "reason": "No unvisited outgoing links" if mode == "explore"
+                                                   else "No outgoing links"})
                 return
             result = self.server.models.predict(name, graph, current, target, options, visited)
             with self.server.timings_lock:

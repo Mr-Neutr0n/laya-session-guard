@@ -36,6 +36,17 @@ class WikiraceDataTest(unittest.TestCase):
             self.assertNotIn(race["target"], train_targets)
             self.assertEqual(distances_to(incoming, race["target"])[race["start"]], race["shortest_hops"])
 
+    def test_explore_shortlist_refills_after_excluding_visited_links(self):
+        graph = {"titles": ["Start"] + [f"Page {n}" for n in range(1, 15)] + ["Goal"],
+                 "links": [list(range(1, 15))] + [[] for _ in range(15)],
+                 "indegree": [0] + [1] * 14 + [0]}
+        baseline = shortlist(graph, 0, 15)
+        explore = shortlist(graph, 0, 15, exclude=(0, 1, 2))
+        self.assertEqual(len(baseline), 12)
+        self.assertEqual(len(explore), 12)
+        self.assertTrue(set(explore).isdisjoint({0, 1, 2}))
+        self.assertEqual(set(explore), set(range(3, 15)))
+
 
 if __name__ == "__main__":
     unittest.main()

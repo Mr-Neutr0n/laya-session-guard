@@ -1,6 +1,18 @@
 const $ = (id) => document.getElementById(id);
 const state = { races: [], models: {}, runId: 0 };
-const maxHops = 8;
+const hopLimit = { benchmark: 8, explore: 16 };
+
+function selectedMode() {
+  return document.querySelector('input[name="race-mode"]:checked').value;
+}
+
+function setupHint() {
+  if (!state.articleCount) return;
+  const count = state.articleCount.toLocaleString();
+  $('setup-note').textContent = selectedMode() === 'explore'
+    ? `${count} archived articles. Explore allows 16 hops and never revisits a page. Results above use Benchmark rules.`
+    : `${count} archived articles. Benchmark uses the original 8-hop rules.`;
+}
 
 function wikiUrl(title) {
   return `https://en.wikipedia.org/wiki/${encodeURIComponent(title.replaceAll(' ', '_'))}`;
@@ -110,7 +122,7 @@ function endTrail(model, message, won = false) {
   setLaneState(model, won ? 'Found it' : 'Stopped', won ? 'won' : 'lost');
 }
 
-async function raceModel(model, race, runId) {
+async function raceModel(model, race, runId, mode) {
   startTrail(model, race);
   if (!state.models[model]?.available) {
     endTrail(model, 'Checkpoint unavailable on this machine.');
@@ -120,18 +132,18 @@ async function raceModel(model, race, runId) {
   setLaneState(model, 'Racing', 'running');
   let current = race.start;
   const visited = [current];
-  for (let hop = 1; hop <= maxHops; hop++) {
+  for (let hop = 1; hop <= hopLimit[mode]; hop++) {
     if (runId !== state.runId) return;
     try {
       const response = await fetch('/api/step', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, current, target: race.target, visited }),
+        body: JSON.stringify({ model, current, target: race.target, visited, mode }),
       });
       const step = await response.json();
       if (runId !== state.runId) return;
       if (!response.ok) throw new Error(step.error || `HTTP ${response.status}`);
       if (step.outcome === 'dead_end') {
-        endTrail(model, 'Dead end. No outgoing links.'); return;
+        endTrail(model, step.reason || 'Dead end. No outgoing links.'); return;
       }
       addStep(model, step, hop);
       showTiming(step.timing);
@@ -146,18 +158,23 @@ async function raceModel(model, race, runId) {
       return;
     }
   }
-  endTrail(model, `Reached the ${maxHops}-hop limit.`);
+  endTrail(model, `Reached the ${hopLimit[mode]}-hop limit.`);
 }
 
 async function runRace() {
   const race = state.races[Number($('race-select').value)];
   if (!race) return;
+  const mode = selectedMode();
   const runId = ++state.runId;
   $('start-button').disabled = true;
+  $('race-select').disabled = true;
+  document.querySelectorAll('input[name="race-mode"]').forEach((input) => { input.disabled = true; });
   $('setup-note').textContent = `Racing from ${race.start_title} to ${race.target_title}.`;
-  await Promise.all(['base', 'tuned'].map((model) => raceModel(model, race, runId)));
+  await Promise.all(['base', 'tuned'].map((model) => raceModel(model, race, runId, mode)));
   if (runId === state.runId) {
     $('start-button').disabled = false;
+    $('race-select').disabled = false;
+    document.querySelectorAll('input[name="race-mode"]').forEach((input) => { input.disabled = false; });
     $('setup-note').textContent = 'Race complete. Pick another course or run this one again.';
   }
 }
@@ -169,6 +186,7 @@ async function load() {
     const data = await response.json();
     state.races = data.races;
     state.models = data.models;
+    state.articleCount = data.article_count;
     const select = $('race-select');
     select.replaceChildren();
     data.races.forEach((race, index) => {
@@ -180,7 +198,7 @@ async function load() {
     if (data.races.length) {
       showCourse();
       $('start-button').disabled = false;
-      $('setup-note').textContent = `${data.article_count.toLocaleString()} archived articles. Up to ${maxHops} hops per model.`;
+      setupHint();
     } else {
       const option = document.createElement('option');
       option.textContent = 'No evaluation races yet';
@@ -198,5 +216,6 @@ async function load() {
 }
 
 $('race-select').addEventListener('change', showCourse);
+document.querySelectorAll('input[name="race-mode"]').forEach((input) => input.addEventListener('change', setupHint));
 $('start-button').addEventListener('click', runRace);
 load();

@@ -25,7 +25,7 @@
       </section>
       <section class="setup" aria-label="Race setup">
         <div class="setup-copy"><span class="section-number">01 / SET THE COURSE</span><h2>Pick a route</h2><p>Evaluation routes come from the archived article graph. Titles below link to current Wikipedia pages for context.</p></div>
-        <div class="controls"><label for="race-select">START → DESTINATION</label><select id="race-select"><option>Loading races...</option></select><div class="course" id="course"><span>Waiting for graph</span></div><button id="start-button" disabled>Run this race <span>↗</span></button><p id="setup-note" class="setup-note" role="status"></p></div>
+        <div class="controls"><label for="race-select">START → DESTINATION</label><select id="race-select"><option>Loading races...</option></select><div class="course" id="course"><span>Waiting for graph</span></div><fieldset class="mode-picker"><legend>RACE MODE</legend><label><input type="radio" name="race-mode" value="benchmark" checked><span><strong>Benchmark</strong><small>8 hops · repeats allowed</small></span></label><label><input type="radio" name="race-mode" value="explore"><span><strong>Explore</strong><small>16 hops · no repeat visits</small></span></label></fieldset><button id="start-button" disabled>Run this race <span>↗</span></button><p id="setup-note" class="setup-note" role="status"></p></div>
       </section>
       <section class="arena" aria-label="Model races">
         <div class="section-heading"><div><span class="section-number">02 / THE RACE</span><h2>Two paths, same course</h2></div><p>Each hop uses a fixed shortlist of at most 12 outgoing links. Model time excludes app rendering and Wikipedia fetches.</p></div>

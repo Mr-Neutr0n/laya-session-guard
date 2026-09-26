@@ -9,3 +9,12 @@
 .benchmark-stat strong{font:normal 24px Georgia,serif;color:var(--green);white-space:nowrap}
 @media(max-width:1000px){.benchmark{grid-template-columns:repeat(3,1fr)}.benchmark>div:first-child{grid-column:1/-1}}
 @media(max-width:600px){.benchmark{grid-template-columns:1fr}.benchmark>div:first-child{grid-column:auto}}
+.mode-picker{border:0;padding:0;margin:0 0 20px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.mode-picker legend{font:10px "Courier New",monospace;letter-spacing:.1em;color:var(--muted);padding:0;margin-bottom:10px}
+.mode-picker label{display:flex;align-items:center;gap:9px;border:1px solid var(--line);padding:12px;margin:0;cursor:pointer;letter-spacing:normal}
+.mode-picker label:has(input:checked){border-color:var(--green);background:#f3f8ec}
+.mode-picker input{accent-color:var(--green);margin:0}
+.mode-picker strong,.mode-picker small{display:block;font-family:Arial,Helvetica,sans-serif;letter-spacing:normal}
+.mode-picker strong{font-size:13px;color:var(--ink)}
+.mode-picker small{font-size:11px;color:var(--muted);margin-top:3px}
+@media(max-width:520px){.mode-picker{grid-template-columns:1fr}}
