@@ -276,6 +276,65 @@ This is stratum `S6` and its `S7` control in `reports/REVIEW_PROTOCOL.md`, and i
 consented human-reviewed cases, which do not yet exist. No further training run should be spent
 until they do.
 
+## The fitted temperature, and why its Brier is worse than no calibration
+
+A separate audit looked for the calibration bug class caught in the arXiv experiment: a temperature
+applied to *already-normalised probabilities*, which is the identity, so a grid search sees a flat
+loss and sticks at its first point.
+
+**That bug is not present here.** `src/train.py` divides **logits** by T and only then applies
+softmax, in both `metrics()` and `fit_temperatures()`. `src/evaluate_jev.py` applies no
+temperature at all; it renormalises the API's two-decimal values purely to make them sum to one.
+On the 352 stored action rows the logit path's loss runs 3.928 at T=0.5 to 0.499 at T=5.0, a spread
+of 3.43, so the surface is not flat and no identity transform is involved. Reproduce with
+`python3 scripts/audit_calibration.py`.
+
+**A different defect is present, and it produced the published 0.5.** The published action
+temperature is exactly **0.5** for both fine-tuned runs, and 0.5 is the first point of
+`torch.linspace(0.5, 5.0, 181)`. The follow-up baseline fit reached 1.825 and 1.125, so the search
+is not pinned in general, but a floor-truncated optimum and a flat calibration surface produce
+identical published output.
+
+**Whether the published 0.5 was a floor truncation cannot be determined from the stored
+artifacts.** The calibration logits were never persisted for any of the three runs.
+`outputs/laya-session-guard/calibration.jsonl` is the calibration *data*, not logits; the pilot's
+`predictions.json` holds per-case logits for its *test* split only. The test-split rows point the
+opposite way, to the upper edge, so they are not evidence either.
+
+**The Brier paradox.** On the stored `test_attack` action rows, the published T=0.5 gives Brier
+**0.3742**, while no calibration at all, T=1.0, gives **0.3676**. The fitted temperature is worse
+than the thing it was fitted to improve. Two things combine: the grid floor pinned the value at an
+extreme that sharpens an already overconfident head, and cross-entropy at T=0.5 can be lower than
+at T=1.0 while multi-class Brier is higher, because Brier punishes the full probability vector
+rather than just the true class. The published `report.json` value, 0.3742112420068335, is
+reproduced exactly by the logit path at T=0.5, which confirms the published number is that
+quantity and that nothing renormalises before scaling.
+
+**Blast radius, stated precisely.**
+
+| Published quantity | Depends on the temperature? |
+| --- | --- |
+| Action and content accuracy, false allows, correct allows, block recall, every confusion matrix | **No.** Argmax is invariant to positive temperature scaling; unchanged on 352 of 352 stored rows. All headline guard numbers and the replicated figures are safe. |
+| Brier and ECE | **Yes.** |
+| Wrapper decisions, including the follow-up run's 1 false allow and 11 reviews | **Yes.** `src/predict.py` defers when the maximum action probability falls below a hardcoded `0.8`, and that probability is the SDK's calibrated output. |
+
+**Correction, shipped as a patch.** `patches/temperature-grid.patch` replaces the linear grid with
+`np.geomspace(0.05, 20.0, 401)` and records, per question, the fitted value, its grid index, the
+loss, and an `edge` marker, so a truncated fit is reported as truncated instead of published as a
+fitted value. It is not applied: `src/train.py` carries uncommitted user work excluded from this
+branch by request. Apply with `git apply patches/temperature-grid.patch`. The optional second
+argument leaves `src/train_risk.py`, which imports this function, working unchanged.
+
+Widening the grid alone is not sufficient, which the stored logits demonstrate. On the pilot's
+fine-tuned action split the optimum falls below **0.05** as well, so the wide grid would still
+report a silent truncation. The edge marker is the half of the change that actually prevents one.
+On the same split the base model's optimum is interior on both grids, at 1.20 and 1.197, so this is
+not a property of every fit.
+
+The audit's own gap is the reason this cannot be closed today: the fix writes per-case calibration
+rows, so the next run can answer it. The running Kaggle v4 kernel is the first run that writes
+`calibration_predictions.jsonl`.
+
 ## Provenance and independent replication
 
 These reports were **independently replicated** from the published artifacts. The replication

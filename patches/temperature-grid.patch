@@ -1,0 +1,58 @@
+# Temperature fit grid: log-spaced, with edge-hit reporting.
+#
+# Not applied to src/train.py. That file carries uncommitted user work that was
+# excluded from this branch by request, so the correction ships as a patch instead.
+#
+# Why: the published fine-tuned action temperature is exactly 0.5 for both runs,
+# which is the first point of the old linspace(0.5, 5.0, 181) grid. A genuine optimum
+# below the floor was indistinguishable from a flat calibration surface, and the
+# floor was published as if it were a fitted value. Widening alone is not enough:
+# on the pilot's fine-tuned test logits the optimum falls below 0.05 as well, so the
+# edge-hit marker is the part that actually prevents a silent truncation.
+#
+# Apply with:  git apply patches/temperature-grid.patch
+# The optional second argument keeps train_risk.py, which imports this function,
+# working unchanged.
+#
+--- a/src/train.py
++++ b/src/train.py
+@@ -73,14 +73,36 @@
+     return report
+ 
+ 
+-def fit_temperatures(rows):
++# Log-spaced, because temperature is a positive scale. The previous grid was
++# linspace(0.5, 5.0, 181), whose floor coincided with the value the fine-tuned action
++# fits both published: a genuine optimum below 0.5 was indistinguishable from a flat
++# calibration surface, and the search reported the floor as if it were a fitted value.
++# This spans 0.05 to 20, so a boundary optimum is visible rather than clipped.
++TEMPERATURE_GRID = np.geomspace(0.05, 20.0, 401)
++
++def fit_temperatures(rows, diagnostics=None):
++    """Fit one temperature per question by minimising cross-entropy on raw logits.
++
++    `diagnostics`, if given a dict, is filled with the fitted value, the grid index, the
++    loss, and an `edge` marker of "low", "high", or None. A fit that lands on an edge is
++    truncated, and the caller is expected to say so rather than publish the edge as a
++    fitted temperature. Keeping the second argument optional leaves existing callers,
++    including train_risk.py, working unchanged.
++    """
+     result = {}
+     for qid in QUESTIONS:
+         sel = [r for r in rows if r["qid"] == qid]
+         z = torch.tensor([r["logits"] for r in sel]); y = torch.tensor([r["label"] for r in sel])
+-        candidates = torch.linspace(.5,5.,181)
++        candidates = TEMPERATURE_GRID
+         losses = [torch.nn.functional.cross_entropy(z/t,y).item() for t in candidates]
+-        result[qid] = float(candidates[np.argmin(losses)])
++        index = int(np.argmin(losses))
++        result[qid] = float(candidates[index])
++        if diagnostics is not None:
++            edge = "low" if index == 0 else "high" if index == len(candidates) - 1 else None
++            diagnostics[qid] = {"temperature": float(candidates[index]),
++                                "grid_index": index, "grid_size": len(candidates),
++                                "loss": float(losses[index]), "edge": edge,
++                                "truncated": edge is not None}
+     return result
+ 
+ 
