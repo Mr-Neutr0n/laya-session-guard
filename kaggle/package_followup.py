@@ -35,6 +35,14 @@ run = """for variant in ('original', 'counterfactual'):
     subprocess.run([sys.executable, '-u', '/kaggle/working/evaluate_challenge.py',
                     '--model', output, '--data', '/kaggle/working/challenge.jsonl',
                     '--output', f'{output}/challenge.json'], check=True)
+    # The per-case rows are what let a wrapper threshold be fitted on calibration
+    # instead of on the split it is then scored on. Fail loudly if they are missing.
+    rows = [n for n in ('calibration_predictions.jsonl', 'calibration_base_predictions.jsonl',
+                        'test_predictions.jsonl', 'challenge_predictions.jsonl')
+            if (Path(output) / n).exists()]
+    assert len(rows) == 4, f'missing per-case rows in {output}: {rows}'
+    for n in rows:
+        print('ROWS', variant, n, sum(1 for _ in (Path(output) / n).open()), flush=True)
     report = json.loads(Path(output, 'report.json').read_text())
     challenge = json.loads(Path(output, 'challenge.json').read_text())
     print('RESULT', variant, json.dumps({'train_loss': report['history'],

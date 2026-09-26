@@ -7,6 +7,7 @@ import torch
 import laya
 from session_data import QUESTIONS
 from context import checked_sequence
+from eval_rows import rows_from_challenge, rows_path, write_rows
 from predict import inspect
 
 
@@ -15,6 +16,9 @@ def main():
     parser.add_argument("--model",default="outputs/laya-session-guard")
     parser.add_argument("--data",default="data/challenge.jsonl")
     parser.add_argument("--output",default="reports/challenge_results.json")
+    parser.add_argument("--rows",default=None,
+                        help="per-case JSONL output path. Defaults to --output with a "
+                             "_predictions.jsonl suffix, next to the other run saves.")
     parser.add_argument("--device",default="cpu")
     args=parser.parse_args()
     torch.set_num_threads(4)
@@ -44,6 +48,11 @@ def main():
              "review_count":sum(p["wrapper_decision"]=="review" for p in predictions)}
     report={"synthetic_only":True,"not_used_for_training_or_calibration":True,"n_sessions":len(rows),"elapsed_seconds":time.monotonic()-started,
             "metrics":metrics,"wrapper":wrapper,"predictions":predictions}
+    Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
+    rows=write_rows(args.rows or Path(args.output).with_name(Path(args.output).stem+"_predictions.jsonl"),
+                    rows_from_challenge(predictions,model=str(args.model)))
+    print("ROWS challenge",len(rows),rows,flush=True)
+    report["per_case_rows"]=str(rows)
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print("CHALLENGE_RESULT",json.dumps({"metrics":metrics,"wrapper":wrapper}),flush=True)
 

@@ -193,6 +193,26 @@ quantity that moves that much between splits of the same model and the same data
 stable operating point, which is the strongest argument for fitting it on a proper calibration set
 rather than on frozen data.
 
+### Instrumentation shipped so the next run does not have this problem
+
+`src/eval_rows.py` now makes every evaluation persist one JSONL row per case, carrying `case_id`,
+`split`, `gold`, `predicted`, the raw `margin`, an explicit `margin_space`, and the
+`wrapper_decision` where a policy wrapper produced one. `src/train_risk.py` writes
+`calibration_predictions.jsonl` next to its other saves, alongside the rows for all four frozen
+splits, and `src/train.py` and `src/evaluate_challenge.py` do the same for the follow-up runs.
+Both `package_*.py` scripts now assert those files exist after a Kaggle run and print their line
+counts, so a run that silently drops them fails instead of producing another un-fittable artifact.
+
+The `margin_space` field is not decoration. Logit and probability margins are not comparable, and
+mixing them across splits is one of the reasons the threshold above came out unstable. A row
+records which space it is in rather than leaving the reader to infer it.
+
+The real risk-ranked calibration rows still cannot be produced, because that checkpoint was
+rejected before its weights were downloaded and `torch`, `laya`, and `transformers` are not
+installed locally. The fixture test therefore derives its logits from the real downloaded
+predictions rather than from invented numbers, and the next Kaggle run will produce the genuine
+`calibration_predictions.jsonl` that makes the fit above unnecessary.
+
 ## Confounds that limit every conclusion here
 
 1. **Single attacker goal.** All 84 ASPI false allows are `injection_task_13`. A data fix

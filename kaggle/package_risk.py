@@ -49,6 +49,16 @@ subprocess.run([sys.executable, '-u', '/kaggle/working/evaluate_challenge.py',
                 '--model', '/kaggle/working/laya-risk-ranked',
                 '--data', '/kaggle/working/challenge.jsonl',
                 '--output', '/kaggle/working/laya-risk-ranked/challenge.json'], env=env, check=True)
+# The per-case rows are the artifact that lets a wrapper threshold be fitted on
+# calibration rather than on the frozen test splits. Fail loudly if they are missing.
+out = Path('/kaggle/working/laya-risk-ranked')
+required = ['calibration_predictions.jsonl', 'test_attack_predictions.jsonl',
+            'test_both_predictions.jsonl', 'test_user_predictions.jsonl',
+            'old_challenge_predictions.jsonl', 'challenge_predictions.jsonl']
+missing = [n for n in required if not (out / n).exists()]
+assert not missing, f'missing per-case rows: {missing}'
+for n in required:
+    print('ROWS', n, sum(1 for _ in (out / n).open()), flush=True)
 """
 notebook = {"nbformat": 4, "nbformat_minor": 5,
             "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}},

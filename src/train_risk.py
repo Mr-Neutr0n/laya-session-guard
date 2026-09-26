@@ -21,6 +21,7 @@ from transformers import AutoTokenizer
 from aspi_data import generate as aspi_generate
 from context import checked_sequence
 from counterfactual_data import generate as counterfactual_generate
+from eval_rows import rows_from_predictions, rows_path, write_rows
 from session_data import QUESTIONS, generate as original_generate
 from train import REVISION, collate, evaluate, fit_temperatures, metrics
 
@@ -210,8 +211,17 @@ def main():
     cfg["model_name"] = "laya-session-guard-risk-ranked-aspi-pilot"
     (OUT / "rl_agent_config.json").write_text(json.dumps(cfg, indent=2))
     final = {}
-    for name in ("test_user", "test_attack", "test_both", "old_challenge"):
+    # Persist per-case rows for every evaluated split, calibration included. Without the
+    # calibration rows a wrapper threshold can only be fitted by reading the frozen test
+    # splits, which is how the risk-ranked run ended up with a threshold whose apparent
+    # gain halved out of sample.
+    for name in ("calibration", "test_user", "test_attack", "test_both", "old_challenge"):
         predictions = evaluate(model, prepared[name], tok, device)
+        path = write_rows(rows_path(OUT, name),
+                          rows_from_predictions(predictions, name, model="risk-ranked"))
+        print("ROWS", name, len(predictions) // len(QUESTIONS), path, flush=True)
+        if name == "old_challenge":
+            continue
         final[name] = {"action": action_summary(predictions),
                        "metrics": metrics(predictions, temperatures)}
         (OUT / f"predictions-{name}.json").write_text(json.dumps(predictions))
@@ -222,6 +232,9 @@ def main():
               "split_sizes": {k: len(v) for k, v in splits.items()},
               "history": history, "baseline": baseline, "finetuned": final,
               "temperatures": temperatures,
+              "per_case_rows": {name: str(rows_path(OUT, name))
+                                for name in ("calibration", "test_user", "test_attack",
+                                             "test_both", "old_challenge")},
               "limitations": ["ASPI adaptation treats clarification as an unverified lower-trust channel",
                               "ASPI labels are benchmark-generated, not human-reviewed session judgments",
                               "Only workspace tasks; not a coding-session production benchmark",
