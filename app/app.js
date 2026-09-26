@@ -129,9 +129,6 @@ async function raceModel(model, race, runId) {
       if (current === race.target) {
         endTrail(model, `Destination found in ${hop} ${hop === 1 ? 'hop' : 'hops'}.`, true); return;
       }
-      if (visited.includes(current)) {
-        endTrail(model, 'This path looped back to an earlier article.'); return;
-      }
       visited.push(current);
     } catch (error) {
       endTrail(model, error.message);
