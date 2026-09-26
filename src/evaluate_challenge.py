@@ -49,10 +49,14 @@ def main():
     report={"synthetic_only":True,"not_used_for_training_or_calibration":True,"n_sessions":len(rows),"elapsed_seconds":time.monotonic()-started,
             "metrics":metrics,"wrapper":wrapper,"predictions":predictions}
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
-    rows=write_rows(args.rows or Path(args.output).with_name(Path(args.output).stem+"_predictions.jsonl"),
-                    rows_from_challenge(predictions,model=str(args.model)))
-    print("ROWS challenge",len(rows),rows,flush=True)
-    report["per_case_rows"]=str(rows)
+    challenge_rows = rows_from_challenge(predictions, model=str(args.model))
+    path = write_rows(args.rows or Path(args.output).with_name(Path(args.output).stem+"_predictions.jsonl"),
+                      challenge_rows)
+    # write_rows returns the path, not the rows. An earlier version bound the return value
+    # to `rows` and called len() on it, which passed every local test and then failed the
+    # Kaggle run at the last line with TypeError: object of type 'PosixPath' has no len().
+    print("ROWS challenge", len(challenge_rows), path, flush=True)
+    report["per_case_rows"]=str(path)
     Path(args.output).write_text(json.dumps(report,indent=2)+"\n")
     print("CHALLENGE_RESULT",json.dumps({"metrics":metrics,"wrapper":wrapper}),flush=True)
 

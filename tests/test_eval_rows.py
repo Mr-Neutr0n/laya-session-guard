@@ -11,6 +11,7 @@ probabilities from outputs/followup/followup-original/challenge.json. The test i
 skipped if those files are absent rather than falling back to made-up numbers.
 """
 
+import ast
 import json
 import sys
 import tempfile
@@ -36,6 +37,64 @@ def real_action_predictions():
 
 def real_challenge_predictions():
     return json.loads(FOLLOWUP_CHALLENGE.read_text())["predictions"]
+
+
+class WriteRowsContractTests(unittest.TestCase):
+    """`write_rows` returns a path. Callers must not treat that return value as the rows.
+
+    Binding `rows = write_rows(...)` and then calling `len(rows)` passed every unit test
+    in this repository and then failed the Kaggle run at its final line with
+    "TypeError: object of type 'PosixPath' has no len()". The reason it survived locally is
+    that ./verify compiles and unit-tests, and none of these entry points is ever executed
+    without a GPU and the laya runtime, so the mistake was invisible until it cost a 39-minute
+    run. These tests close that gap statically.
+    """
+
+    ENTRY_POINTS = ("train_risk.py", "train.py", "evaluate_challenge.py")
+
+    def test_write_rows_returns_a_path_not_the_rows(self):
+        rows = [{"case_id": "a", "split": "dev", "gold": "allow", "predicted": "allow",
+                 "margin": 1.0, "margin_space": "logit"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            returned = write_rows(Path(tmp) / "out.jsonl", rows)
+        self.assertIsInstance(returned, Path)
+        self.assertEqual(returned.name, "out.jsonl")
+
+    def test_no_entry_point_measures_the_length_of_a_write_rows_return(self):
+        for name in self.ENTRY_POINTS:
+            with self.subTest(script=name):
+                path = ROOT / "src" / name
+                tree = ast.parse(path.read_text())
+                bound = {}
+                for node in ast.walk(tree):
+                    if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+                        func = node.value.func
+                        called = getattr(func, "id", None) or getattr(func, "attr", None)
+                        if called == "write_rows":
+                            for target in node.targets:
+                                if isinstance(target, ast.Name):
+                                    bound[target.id] = node.lineno
+                offenders = []
+                for node in ast.walk(tree):
+                    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                            and node.func.id == "len" and node.args
+                            and isinstance(node.args[0], ast.Name)
+                            and node.args[0].id in bound):
+                        offenders.append((node.lineno, node.args[0].id, bound[node.args[0].id]))
+                self.assertEqual(offenders, [], f"{name}: len() applied to a write_rows "
+                                                f"return bound at lines {bound}")
+
+    def test_evaluate_challenge_separates_the_two_row_variables(self):
+        """A source-level guard on the exact defect, kept alongside the AST check.
+
+        The file has a pre-existing local named `rows` that holds the input cases, and
+        len(rows) on that is correct, so this asserts on the new names rather than on the
+        bare string.
+        """
+        source = (ROOT / "src" / "evaluate_challenge.py").read_text()
+        self.assertIn("challenge_rows = rows_from_challenge(", source)
+        self.assertIn("path = write_rows(", source)
+        self.assertIn("len(challenge_rows)", source)
 
 
 class MarginTests(unittest.TestCase):
