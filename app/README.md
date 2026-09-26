@@ -7,7 +7,7 @@ Run from the repository root:
 ```sh
 LAYA_BASE_MODEL=outputs/wikirace/base \
 LAYA_TUNED_MODEL=outputs/wikirace/tuned \
-LAYA_DEVICE=cpu python3 app/server.py
+LAYA_DEVICE=cpu .venv/bin/python app/server.py
 ```
 
 Open `http://127.0.0.1:8765`. The app loads `data/wikirace/graph.json` and `data/wikirace/eval_races.json`. It shows an unavailable checkpoint as such, without substituting a heuristic result. Model files stay in local directories and the server loads each checkpoint on its first move.

@@ -19,6 +19,16 @@ kaggle datasets create -p kaggle/wikirace-dataset -t
 kaggle kernels push -p kaggle/wikirace --accelerator NvidiaTeslaT4 -t 7200
 ```
 
-For this run, the private Kaggle dataset is [laya-wikirace-data](https://www.kaggle.com/datasets/uranium53/laya-wikirace-data) and the private notebook is [laya-wikiracing-base-vs-fine-tuned](https://www.kaggle.com/code/uranium53/laya-wikiracing-base-vs-fine-tuned). Once it completes, download its output into `outputs/wikirace/tuned`, run `PYTHONPATH=. python3 scripts/setup_wikirace_models.py` in an environment with `requirements.txt` installed, and start the [app](../app/README.md).
+For this run, the private Kaggle dataset is [laya-wikirace-data](https://www.kaggle.com/datasets/uranium53/laya-wikirace-data) and the private notebook is [laya-wikiracing-base-vs-fine-tuned](https://www.kaggle.com/code/uranium53/laya-wikiracing-base-vs-fine-tuned). The [measured results](../reports/WIKIRACE_RESULTS.md) compare both checkpoints. Download and prepare the checkpoints before starting the [app](../app/README.md):
+
+```sh
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r requirements.txt
+mkdir -p outputs/wikirace
+kaggle kernels output uranium53/laya-wikiracing-base-vs-fine-tuned -p outputs/wikirace
+mv outputs/wikirace/laya-wikirace outputs/wikirace/tuned
+PYTHONPATH=. .venv/bin/python scripts/setup_wikirace_models.py
+.venv/bin/python app/server.py
+```
 
 The source archive, Kaggle dataset copy, and checkpoints are ignored by Git. The derived graph, decision splits, race list, provenance, code, and notebook are in the repository.

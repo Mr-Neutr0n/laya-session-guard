@@ -1,6 +1,6 @@
 # Laya session guard
 
-For the separate Wikipedia racing experiment and app, see [Wikiracing](wikirace/README.md).
+For the separate Wikipedia racing experiment and app, see [Wikiracing](wikirace/README.md) and its [measured results](reports/WIKIRACE_RESULTS.md).
 
 Fine-tuning completed and the saved model loads locally. **This checkpoint is not suitable for automatic tool authorization.** On 24 separately written synthetic sessions it detected 4 of 11 suspicious sources, achieved 54.2% action accuracy, and incorrectly allowed two actions. See [the results](reports/RESULTS.md).
 

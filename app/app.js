@@ -43,6 +43,16 @@ function showTiming(timing) {
   }
 }
 
+function showBenchmark(report) {
+  if (report?.status !== 'completed') return;
+  const base = report.base;
+  const tuned = report.tuned;
+  $('bench-wins').textContent = `${base.races.wins} → ${tuned.races.wins}`;
+  $('bench-accuracy').textContent = `${(base.decisions.top1_accuracy * 100).toFixed(1)}% → ${(tuned.decisions.top1_accuracy * 100).toFixed(1)}%`;
+  $('bench-latency').textContent = `${base.races.latency_ms_p50.toFixed(1)} → ${tuned.races.latency_ms_p50.toFixed(1)} ms`;
+  $('benchmark').hidden = false;
+}
+
 function startTrail(model, race) {
   const trail = $(`${model}-trail`);
   trail.replaceChildren();
@@ -178,6 +188,7 @@ async function load() {
       $('setup-note').textContent = 'Add data/wikirace/eval_races.json to enable races.';
     }
     showTiming(data.timing);
+    showBenchmark(data.report);
     for (const model of ['base', 'tuned']) {
       if (!data.models[model]?.available) setLaneState(model, 'Unavailable', 'unavailable');
     }

@@ -17,6 +17,12 @@
         <h1>Can a small model<br><em>find its way?</em></h1>
         <p>Two Laya checkpoints. One starting article, one destination, and the same link-selection rules. Watch each model choose a path through Wikipedia.</p>
       </section>
+      <section class="benchmark" id="benchmark" hidden aria-label="Held-out benchmark">
+        <div><span class="section-number">HELD-OUT TEST</span><h2>More wins. Similar speed.</h2><p>60 archived races, eight-hop limit. Both checkpoints used the same routes and link choices.</p></div>
+        <div class="benchmark-stat"><span>RACES WON</span><strong id="bench-wins">-</strong><small>base → tuned</small></div>
+        <div class="benchmark-stat"><span>CHOICE ACCURACY</span><strong id="bench-accuracy">-</strong><small>600 held-out decisions</small></div>
+        <div class="benchmark-stat"><span>T4 MEDIAN INFERENCE</span><strong id="bench-latency">-</strong><small>model time per move</small></div>
+      </section>
       <section class="setup" aria-label="Race setup">
         <div class="setup-copy"><span class="section-number">01 / SET THE COURSE</span><h2>Pick a route</h2><p>Evaluation routes come from the archived article graph. Titles below link to current Wikipedia pages for context.</p></div>
         <div class="controls"><label for="race-select">START → DESTINATION</label><select id="race-select"><option>Loading races...</option></select><div class="course" id="course"><span>Waiting for graph</span></div><button id="start-button" disabled>Run this race <span>↗</span></button><p id="setup-note" class="setup-note" role="status"></p></div>
@@ -26,7 +32,7 @@
         <div class="lanes"><article class="lane" id="base-lane"><div class="lane-head"><span class="lane-badge base-badge">A</span><div><p>ORIGINAL CHECKPOINT</p><h3>Base Laya</h3></div><span class="lane-state" id="base-state">Waiting</span></div><div class="lane-metrics"><div><span>HOPS</span><strong id="base-hops">0</strong></div><div><span>MODEL P50</span><strong id="base-p50">n/a</strong></div><div><span>MODEL P95</span><strong id="base-p95">n/a</strong></div></div><div class="trail" id="base-trail"><div class="empty">Run a race to see the model's route.</div></div></article>
           <article class="lane" id="tuned-lane"><div class="lane-head"><span class="lane-badge tuned-badge">B</span><div><p>WIKIRACE CHECKPOINT</p><h3>Fine-tuned Laya</h3></div><span class="lane-state" id="tuned-state">Waiting</span></div><div class="lane-metrics"><div><span>HOPS</span><strong id="tuned-hops">0</strong></div><div><span>MODEL P50</span><strong id="tuned-p50">n/a</strong></div><div><span>MODEL P95</span><strong id="tuned-p95">n/a</strong></div></div><div class="trail" id="tuned-trail"><div class="empty">Run a race to see the model's route.</div></div></article></div>
       </section>
-      <section class="notes"><span class="section-number">03 / HOW TO READ THIS</span><div><h2>What counts as fast?</h2><p>The timing shown here measures <strong>model inference only</strong>, after each checkpoint loads. P50 is the median decision time; P95 shows slower decisions. This app reads an archived <a href="https://snap.stanford.edu/data/wikispeedia.html" target="_blank" rel="noopener noreferrer">Stanford Wikispeedia graph</a> from disk, so page fetch time is zero during a race. The article links open live Wikipedia only when you click them.</p></div></section>
+      <section class="notes"><span class="section-number">03 / HOW TO READ THIS</span><div><h2>What counts as fast?</h2><p>The timing shown here measures <strong>model inference only</strong>, after each checkpoint loads. P50 is the median decision time; P95 shows slower decisions. These local measurements can vary when both models run at once; use the paired Kaggle run for a controlled latency comparison. This app reads an archived <a href="https://snap.stanford.edu/data/wikispeedia.html" target="_blank" rel="noopener noreferrer">Stanford Wikispeedia graph</a> from disk, so page fetch time is zero during a race. The article links open live Wikipedia only when you click them.</p></div></section>
     </main>
     <footer>LAYA LAB <span>·</span> WIKIRACING EXPERIMENT</footer>
   </div>

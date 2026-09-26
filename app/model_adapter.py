@@ -19,6 +19,7 @@ class ModelAdapter:
     def __init__(self):
         self._agents = {}
         self._locks = {"base": Lock(), "tuned": Lock()}
+        self._load_lock = Lock()
         self._paths = {
             "base": os.environ.get("LAYA_BASE_MODEL", "outputs/wikirace/base"),
             "tuned": os.environ.get("LAYA_TUNED_MODEL", "outputs/wikirace/tuned"),
@@ -40,13 +41,14 @@ class ModelAdapter:
         labels = questions[QUESTION_ID]["criteria"]
         with self._locks[name]:
             if name not in self._agents:
-                os.environ.setdefault("USE_TF", "0")
-                os.environ.setdefault("USE_FLAX", "0")
-                try:
-                    import laya
-                    self._agents[name] = laya.load(str(path), device=self.device)
-                except Exception as error:
-                    raise ModelUnavailable(f"Could not load {name} checkpoint: {type(error).__name__}: {error}") from error
+                with self._load_lock:
+                    os.environ.setdefault("USE_TF", "0")
+                    os.environ.setdefault("USE_FLAX", "0")
+                    try:
+                        import laya
+                        self._agents[name] = laya.load(str(path), device=self.device)
+                    except Exception as error:
+                        raise ModelUnavailable(f"Could not load {name} checkpoint: {type(error).__name__}: {error}") from error
             start = perf_counter()
             try:
                 answer = self._agents[name].predict(model_state, questions)["answers"][QUESTION_ID]

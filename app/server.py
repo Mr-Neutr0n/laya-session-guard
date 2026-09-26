@@ -18,6 +18,7 @@ from model_adapter import ModelAdapter, ModelUnavailable  # noqa: E402
 
 GRAPH_FILE = ROOT / "data/wikirace/graph.json"
 RACES_FILE = ROOT / "data/wikirace/eval_races.json"
+REPORT_FILE = ROOT / "outputs/wikirace/tuned/report.json"
 
 
 def percentile(values, rate):
@@ -35,6 +36,7 @@ class RaceServer(ThreadingHTTPServer):
         super().__init__(address, Handler)
         self.graph = load_graph(GRAPH_FILE)
         self.races = json.loads(RACES_FILE.read_text()) if RACES_FILE.exists() else []
+        self.report = json.loads(REPORT_FILE.read_text()) if REPORT_FILE.exists() else None
         self.models = ModelAdapter()
         self.timings = {"base": [], "tuned": []}
         self.timings_lock = Lock()
@@ -66,6 +68,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response(200, {"source": "Archived Wikispeedia article graph",
                                      "article_count": len(graph["titles"]), "races": races,
                                      "models": self.server.models.status(),
+                                     "report": self.server.report,
                                      "timing": self.server.timing_summary()})
             return
         if route == "/api/timing":
