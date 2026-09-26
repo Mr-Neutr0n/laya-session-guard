@@ -219,6 +219,10 @@ def main():
                                           for bucket in ("2", "3-5", "6-10", "11+")}
     cfg["fine_tuned"] = True
     cfg["model_name"] = "laya-wikirace-wikispeedia"
+    # The base config ships upstream training metadata. Replace it with this run's record.
+    cfg["training"] = {"updates": total_steps, "epochs_completed": epochs,
+                       "hours": round(training_seconds / 3600, 2), "world_size": 1,
+                       "fine_tuned_from_checkpoint": True}
     (OUT / "rl_agent_config.json").write_text(json.dumps(cfg, indent=2))
     tokenizer.save_pretrained(OUT / "tokenizer")
     model.encoder.config.save_pretrained(OUT / "encoder")
