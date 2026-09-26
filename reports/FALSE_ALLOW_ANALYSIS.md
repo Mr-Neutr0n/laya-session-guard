@@ -73,9 +73,9 @@ because no wrapper can manufacture a signal that is not present.
 
 **Cheapest wrapper-side fix.** The allow-margin threshold, which reaches it unusually well: at
 t=14 it catches **17 of 18** benign-source failures on `test_attack` (94%) and 3 of 5 on
-`test_both` (60%). These have the lowest median margin of any subset, 9.6, so they are the
-easiest to catch incidentally. That is fortunate, not principled, and the figure is in-sample;
-the honest cross-fitted gain is roughly half of anything measured in place.
+`test_both` (60%). These have the lowest median margin of any subset, 9.4 on the 18 and 9.8 across
+all 23, so they are the easiest to catch incidentally. That is fortunate, not principled, and the
+figure is in-sample; the honest cross-fitted gain is roughly half of anything measured in place.
 
 **Expected gain.** Data fix: unquantifiable until the set exists; this is the entire point of
 building it. Threshold: in-sample 20 of 23 Mode 1 failures converted to `review` at 2 of 176
@@ -106,11 +106,14 @@ almost all legitimate work. Rejected.
 **Cheapest fix that is actually acceptable.** The allow-margin threshold again: 35 of 48 injected
 false allows on `test_attack` (73%) and 7 of 13 on `test_both` (54%), in-sample.
 
-**Expected gain.** Threshold: 42 of 59 content-flagged cases converted in-sample, roughly half out
-of sample. Data fix: replace the two independent questions with a single authorization question
-that sees the content judgment as input, so the model cannot act on a signal it produced and then
-discard. This is a schema and objective change, and it is the only change that addresses the mode's
-cause rather than its symptom. Not attempted here; this checkpoint is rejected.
+**Expected gain.** Threshold: 42 of the 61 injected false allows converted in-sample, 35 on
+`test_attack` and 7 on `test_both`, roughly half out of sample. That is a subset of the 59
+content-flagged cases, not a count of them: two injected cases were missed by the content question
+as well, and the 42 converted are drawn from all 61. Data fix: replace the two independent
+questions with a single authorization question that sees the content judgment as input, so the
+model cannot act on a signal it produced and then discard. This is a schema and objective change,
+and it is the only change that addresses the mode's cause rather than its symptom. Not attempted
+here; this checkpoint is rejected.
 
 **Counting note.** The 61 injected and the 59 content-flagged are different subsets, not two
 spellings of one number. Two injected cases defeated the content question as well as the action
@@ -120,9 +123,11 @@ are correct and both sum to 84.
 
 ### Mode 3: the errors are confident, which rules out recalibration
 
-Cross-cutting, not a separate set of cases. Median allow-margin over the false allows is
-**11.6** on `test_attack` and **13.8** on `test_both**, with interquartile ranges of 8.3 to 13.8
-and 9.0 to 16.8. The model is not uncertain and near the boundary; it is confidently wrong, and
+Cross-cutting, not a separate set of cases. The margin is
+`allow_logit - log(exp(block_logit) + exp(review_logit))`, so a positive value means the
+probability mass on `allow` exceeds the other two combined. Median over the false allows is
+**11.3** on `test_attack` and **12.6** on `test_both`, with interquartile ranges of **8.3 to 13.8**
+and **9.2 to 16.3**. The model is not uncertain and near the boundary; it is confidently wrong, and
 more confidently wrong on the injected subset than the benign one.
 
 **Consequence.** Temperature or calibration fixes cannot help. Only a threshold well outside the
@@ -168,9 +173,16 @@ locally. Doing it properly requires either persisting calibration predictions in
 re-running inference on the calibration split with the checkpoint in hand.
 
 What is available is a cross-fit within the frozen splits, which measures the selection bias
-directly instead of hiding it. The rule was fixed in advance: take the largest threshold whose
-correct-allow deferral stays within 1% on the **fitting** split, then report on a **different**
-split.
+directly instead of hiding it. The rule was fixed in advance.
+
+**Margin definition.** `margin = allow_logit - log(exp(block_logit) + exp(review_logit))`, which is
+`log(P(allow) / (P(block) + P(review)))` before temperature scaling. Deferring an allow when
+`margin < t` therefore requires the probability mass on `allow` to exceed the other two combined by
+a factor of `exp(t)`.
+
+**Fit rule.** Grid `t` over `{0, 0.5, 1.0, ..., 29.5}`. Take the largest `t` whose deferral rate on
+the **correct allows of the fitting split** stays within **1%**. Report on a **different** split.
+Both are implemented in `scripts/analyze_false_allows.py`; neither was a free parameter.
 
 | Fitted on | t | Evaluated on | False allows caught | Correct allows deferred |
 | --- | ---: | --- | ---: | ---: |
@@ -263,6 +275,26 @@ training run:
 This is stratum `S6` and its `S7` control in `reports/REVIEW_PROTOCOL.md`, and it is blocked on
 consented human-reviewed cases, which do not yet exist. No further training run should be spent
 until they do.
+
+## Provenance and independent replication
+
+These reports were **independently replicated** from the published artifacts. The replication
+reproduced every headline number, and contradicted three details in this report, all of which are
+now corrected above: the Mode 3 medians and interquartile ranges, the Mode 1 median, and the
+"42 of 59" phrasing. The cause was an order statistic computed by indexing a sorted list at
+`n//2`, `n//4` and `3n//4`, which is not a median for even `n` and is not a quartile at all. The
+conclusions did not change, but the numbers were wrong. `scripts/analyze_false_allows.py` now uses
+`statistics.median` and `statistics.quantiles(..., method="inclusive")`, and the margin and fit
+definitions are stated explicitly above because the table could not be reproduced without them.
+
+Replication checkout: `/Users/harikp/Developer/scratch/laya-replication/`.
+
+Reproduce locally:
+
+```
+python3 scripts/verify_risk_report.py       # every number in RISK_RANKED.md
+python3 scripts/analyze_false_allows.py     # every number in this report
+```
 
 ## Verdict
 
