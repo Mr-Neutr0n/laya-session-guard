@@ -371,7 +371,7 @@ LIMITS = f"""## 7. What this establishes, and what it does not
 
 The fine-tune is a real, reproducible improvement over the base checkpoint on the same held-out questions and the same routes, with paired intervals that exclude zero. It holds when the race set is quadrupled and restricted to routes that are new in that larger set. It is still a weak navigator: 90 wins against a ceiling of 222 on the 240 routes, on a historical subset of Wikipedia, with labels defined by graph search rather than human preference.
 
-Important limits:
+## 8. Important limits
 
 - **Historical graph.** 4,604 articles from the archived Wikispeedia dataset, not live Wikipedia. Live edits do not affect a race.
 - **Achievable ceiling.** 5 of the 60 Kaggle routes and 18 of the 240 have no route within eight moves through the offered shortlist, so a perfect 240/240 is not a valid target.
@@ -421,7 +421,7 @@ FAILURE_MD = """## 5. A race the fine-tune lost
 Aggregates hide the interesting cases. This section prints the routes where the base checkpoint won and the fine-tune lost, and the routes where both won but the fine-tune wandered longer. The point is not that the fine-tune is uniformly better. It is that the improvement is uneven, and the published traces let a reader check that claim instead of taking it on trust.
 """
 
-RERUN_MD = """## 8. Rerun the model, optionally
+RERUN_MD = """## 9. Rerun the model, optionally
 
 Everything above is recomputed from published logits and traces. That keeps Run All free and fast, and it keeps the notebook from quietly replacing measured results with new ones. If you want fresh inferences, enable a GPU in Kaggle and set `RERUN_LAYA = True`; CPU works but is much slower. The cell only downloads the two checkpoints. Reruns are your own and are not written back here.
 """
@@ -444,9 +444,9 @@ CELLS = [
     cell("code", FAILURE, "failure"),
     cell("markdown", EXTENDED_MD, "extended-md"),
     cell("code", EXTENDED, "extended"),
+    cell("markdown", LIMITS, "limits"),
     cell("markdown", RERUN_MD, "rerun-md"),
     cell("code", RERUN, "rerun"),
-    cell("markdown", LIMITS, "limits"),
 ]
 
 
