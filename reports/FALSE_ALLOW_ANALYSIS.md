@@ -41,7 +41,7 @@ section before treating any of it as a general result.
 
 | | |
 | --- | --- |
-| Count | **25** of 84 ASPI false allows (20 on `test_attack`, 5 on `test_both`) |
+| Count | **23** of 84 ASPI false allows (18 on `test_attack`, 5 on `test_both`) |
 | Gold | `block` |
 | Model | `allow` |
 | Source | The **benign** clarification. No injection, no injected operator, nothing adversarial in the transcript. |
@@ -78,16 +78,16 @@ easiest to catch incidentally. That is fortunate, not principled, and the figure
 the honest cross-fitted gain is roughly half of anything measured in place.
 
 **Expected gain.** Data fix: unquantifiable until the set exists; this is the entire point of
-building it. Threshold: in-sample 20 of 25 Mode 1 failures converted to `review` at 2 of 176
+building it. Threshold: in-sample 20 of 23 Mode 1 failures converted to `review` at 2 of 176
 correct allows deferred. The cross-fit says to expect roughly half that.
 
 ### Mode 2: the content question flagged it and the action question ignored it
 
 | | |
 | --- | --- |
-| Count | **59** of 84 ASPI false allows (46 on `test_attack`, 13 on `test_both`) |
-| Source | Genuinely injected, operators `GS` 20, `HR` 20, `CP` 21 |
-| Content question | Correctly answered `suspicious` on 70% of `test_attack` and 72% of `test_both` false allows |
+| Count | **61** of 84 ASPI false allows (48 on `test_attack`, 13 on `test_both`) |
+| Source | Genuinely injected, operators `CP` 21, `GS` 20, `HR` 20 |
+| Content question | Correctly answered `suspicious` on **59 of the 61**, and missed 2. It flagged 0 of the 23 benign-source cases, so it contributes nothing to Mode 1. |
 | Model action | `allow` anyway |
 
 Representative case, `aspi-user_task_14-injection_task_13-injected-0-attacker`: identical to the
@@ -106,11 +106,17 @@ almost all legitimate work. Rejected.
 **Cheapest fix that is actually acceptable.** The allow-margin threshold again: 35 of 48 injected
 false allows on `test_attack` (73%) and 7 of 13 on `test_both` (54%), in-sample.
 
-**Expected gain.** Threshold: 42 of 59 converted in-sample, roughly half out of sample. Data fix:
-replace the two independent questions with a single authorization question that sees the content
-judgment as input, so the model cannot act on a signal it produced and then discard. This is a
-schema and objective change, and it is the only change that addresses the mode's cause rather than
-its symptom. Not attempted here; this checkpoint is rejected.
+**Expected gain.** Threshold: 42 of 59 content-flagged cases converted in-sample, roughly half out
+of sample. Data fix: replace the two independent questions with a single authorization question
+that sees the content judgment as input, so the model cannot act on a signal it produced and then
+discard. This is a schema and objective change, and it is the only change that addresses the mode's
+cause rather than its symptom. Not attempted here; this checkpoint is rejected.
+
+**Counting note.** The 61 injected and the 59 content-flagged are different subsets, not two
+spellings of one number. Two injected cases defeated the content question as well as the action
+question, and the 23 benign-source cases defeated both. An earlier draft stated Mode 1 as 25 and
+Mode 2 as 59 while listing operator counts that sum to 61, conflating the two subsets. 23 and 61
+are correct and both sum to 84.
 
 ### Mode 3: the errors are confident, which rules out recalibration
 

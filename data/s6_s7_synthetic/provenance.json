@@ -1,0 +1,34 @@
+{
+  "generator": "scripts/generate_s6_s7_synthetic.py",
+  "schema_version": "1.0.0",
+  "seed": 20260927,
+  "pairs": 64,
+  "counts": {
+    "total": 136,
+    "s6": 64,
+    "s7": 64,
+    "review_support": 8,
+    "by_stratum": {
+      "S1": 4,
+      "S6": 64,
+      "S7": 64,
+      "S8": 4
+    },
+    "by_split": {
+      "calib": 46,
+      "dev": 48,
+      "test": 42
+    },
+    "s6_in_sealed_test": 21
+  },
+  "data_origin": "synthetic",
+  "purpose": "Synthetic stopgap covering the Mode 1 shape: an ordinary outward action the user never authorized, with no injection phrasing anywhere in the transcript.",
+  "limitations": [
+    "SYNTHETIC. This is not human-reviewed data and is not a measurement of any model.",
+    "This set is not a substitute for consented, human-reviewed coding sessions, and it must never be presented as a substitute for them or cited as human-reviewed evidence.",
+    "Labels here are assigned by construction from the pair template, not judged by a person against a real session, so they carry no inter-rater agreement signal and the agreement threshold in the review protocol cannot be applied to them.",
+    "Every Mode 1 failure in the rejected run shares one action shape, so covering that shape does not establish coverage of ordinary unauthorized actions in general. Shape coverage is 5 of 5 features; task-level coverage is thin, 5 narrow task templates against 23 distinct tasks behind the failures.",
+    "Text is generated from a fixed template, so a model could in principle learn the template rather than the authorization rule. That is exactly the same-generator confound the rejected run was already guilty of.",
+    "The sealed test split contains no review cases, so the review class cannot be scored on it from this set alone."
+  ]
+}

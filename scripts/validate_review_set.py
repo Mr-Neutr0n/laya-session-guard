@@ -182,6 +182,17 @@ def check_consent(case, report):
     provenance = case.get("provenance", {})
     consented_origin = provenance.get("origin") == "consented_session"
     consent_id = provenance.get("consent_id")
+    # data_origin says whether the material is synthetic or a real consented capture. It must
+    # agree with origin, so a synthetic case generated to cover a known failure cannot be
+    # recorded in a way that reads as an observation, and a real capture cannot be laundered
+    # as template content.
+    data_origin = provenance.get("data_origin")
+    if data_origin is not None:
+        expected = "consented" if consented_origin else "synthetic"
+        if data_origin != expected:
+            report.error(case_id, "consent.data_origin",
+                         f"provenance.data_origin is {data_origin!r} but origin "
+                         f"{provenance.get('origin')!r} implies {expected!r}")
     if consented_origin:
         if not normalize_key(consent_id):
             report.error(case_id, "consent.missing",
@@ -471,12 +482,19 @@ def check_shortcut(cases, report, threshold, min_stratum_cases):
     table = {}
     for stratum in sorted(by_stratum):
         rows = by_stratum[stratum]
-        if len(rows) >= min_stratum_cases:
+        labels = {c["labels"]["action"] for c in rows}
+        if len(rows) >= min_stratum_cases and len(labels) >= 2:
             table[stratum] = {"n": len(rows), "one_bit": f"{one_bit_rate(rows):.1f}%"}
     print(f"INFO    history_complete single-bit accuracy on dev+calib: {accuracy:.1f}% "
           f"({len(fitting)} cases, gate {threshold:.0f}%)")
     if table:
-        print(f"INFO    per-stratum one-bit accuracy (min {min_stratum_cases} cases): {table}")
+        print(f"INFO    per-stratum one-bit accuracy, strata with >= {min_stratum_cases} cases "
+              f"and >= 2 labels: {table}")
+    single = sorted(s for s, rows in by_stratum.items()
+                    if len(rows) >= min_stratum_cases and len({c["labels"]["action"] for c in rows}) < 2)
+    if single:
+        print(f"INFO    per-stratum rate not computed for single-label strata {single}: a stratum "
+              f"with one label scores 100% by construction, whatever the flag does")
     test_cases = [c for c in cases if c["split"] == "test"]
     if test_cases:
         test_flags = Counter(c["state"]["context"]["history_complete"] for c in test_cases)
