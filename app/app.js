@@ -95,7 +95,7 @@ function addStep(model, step, hop) {
   const probability = step.candidates.find((item) => item.index === step.index)?.probability ?? 0;
   fill.style.width = `${Math.min(100, probability * 100)}%`;
   bar.append(fill);
-  meta.append(bar, `${(probability * 100).toFixed(1)}% choice probability · ${step.candidates.length} legal links shown`);
+  meta.append(bar, `${(probability * 100).toFixed(1)}% choice probability · ${step.candidates.length} links considered`);
   el.append(row, meta);
   $(`${model}-trail`).append(el);
   el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

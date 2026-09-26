@@ -215,7 +215,8 @@ def main():
     tuned_preds = predictions(model, splits["test"], tokenizer, device)
     tuned_decisions = decision_metrics(tuned_preds, tuned_temp)
     tuned_races = race_metrics(model, tokenizer, cfg, graph, device, races, tuned_temp)
-    cfg["temperature_by_options"] = {"choice:11+": tuned_temp}
+    cfg["temperature_by_options"] = {f"choice:{bucket}": tuned_temp
+                                          for bucket in ("2", "3-5", "6-10", "11+")}
     cfg["fine_tuned"] = True
     cfg["model_name"] = "laya-wikirace-wikispeedia"
     (OUT / "rl_agent_config.json").write_text(json.dumps(cfg, indent=2))

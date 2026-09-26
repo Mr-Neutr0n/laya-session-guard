@@ -16,7 +16,8 @@ def calibrated_config(folder, temperature):
     path = folder / "rl_agent_config.json"
     cfg = json.loads(path.read_text())
     cfg["temperature"] = [1.0, 1.0, 1.0]
-    cfg["temperature_by_options"] = {"choice:11+": temperature}
+    cfg["temperature_by_options"] = {f"choice:{bucket}": temperature
+                                      for bucket in ("2", "3-5", "6-10", "11+")}
     path.write_text(json.dumps(cfg, indent=2))
 
 
