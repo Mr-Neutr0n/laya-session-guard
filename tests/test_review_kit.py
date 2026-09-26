@@ -34,10 +34,31 @@ def rows(path):
 class TemplateTests(unittest.TestCase):
     """The shipped templates must validate against the current schema, as shipped."""
 
-    def test_case_template_validates_clean(self):
-        result = run_batch(str(TEMPLATE), "--min-test-per-stratum", "0")
+    def test_case_template_validates_clean_with_placeholders_allowed(self):
+        result = run_batch(str(TEMPLATE), "--min-test-per-stratum", "0", "--allow-placeholders")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("0 errors", result.stdout)
+
+    def test_case_template_is_refused_as_a_batch(self):
+        """A template is a shape, not a case. It must not pass the gate unedited."""
+        result = run_batch(str(TEMPLATE), "--min-test-per-stratum", "0")
+        self.assertEqual(result.returncode, 1, "an unedited template must not be accepted")
+        self.assertIn("template.unedited", result.stdout)
+
+    def test_consented_template_placeholder_consent_id_is_refused(self):
+        """The exact case that got through in the second campaign."""
+        rows = TEMPLATE.read_text()
+        self.assertIn("REPLACE-WITH-YOUR-CONSENT-ID", rows)
+        result = run_batch(str(TEMPLATE), "--min-test-per-stratum", "0")
+        self.assertIn("template.unedited", result.stdout)
+
+    def test_empty_batch_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            batch = Path(tmp) / "empty.jsonl"
+            batch.write_text("")
+            result = run_batch(str(batch))
+        self.assertEqual(result.returncode, 1, "an empty batch must not validate")
+        self.assertIn("batch.empty", result.stdout)
 
     def test_examples_validate_clean(self):
         result = run_batch(str(EXAMPLES), "--min-test-per-stratum", "0")
@@ -190,6 +211,10 @@ class ReadmeTests(unittest.TestCase):
                       "annotations[].action", "adjudication", "provenance.consent_id",
                       "provenance.data_origin", "group.session_id"):
             self.assertIn(field, self.flat, f"decision table missing {field}")
+
+    def test_readme_documents_allow_placeholders(self):
+        self.assertIn("--allow-placeholders", self.flat)
+        self.assertIn("do not pass the gate as shipped", self.flat)
 
     def test_readme_refuses_to_describe_synthetic_as_human_evidence(self):
         flat = self.flat.lower()

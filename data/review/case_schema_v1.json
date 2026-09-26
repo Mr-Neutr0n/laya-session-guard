@@ -103,14 +103,14 @@
     "provenance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["origin", "consent_id", "redaction", "notes"],
+      "required": ["origin", "data_origin", "consent_id", "redaction", "notes"],
       "properties": {
         "origin": {
           "description": "llm_generated is deliberately absent. Labels must come from a human, so a case claiming model-generated ground truth cannot be expressed. synthetic_fixture is for validator tests only and is not valid dataset content.",
           "enum": ["synthetic_fixture", "synthetic_template", "consented_session"]
         },
         "data_origin": {
-          "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Optional, and when present it must agree with origin: the validator rejects a mismatch.",
+          "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Required, and the validator rejects a value that disagrees with origin. It is required rather than optional because an omitted tag is indistinguishable from a forgotten one, which is exactly how synthetic material would end up unlabelled.",
           "enum": ["synthetic", "consented"]
         },
         "consent_id": {

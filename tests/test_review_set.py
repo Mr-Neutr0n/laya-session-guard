@@ -224,6 +224,56 @@ class CoverageTests(unittest.TestCase):
         _, output = run_validator("clean.jsonl")
         self.assertNotIn("coverage.test_stratum", output)
 
+    def test_coverage_counts_distinct_tasks_not_cases(self):
+        """Twenty copies of one session are one observation."""
+        cases = []
+        for i in range(20):
+            case = copy.deepcopy(next(c for c in rows("clean.jsonl")
+                                      if c["case_id"] == "fix-test-01"))
+            case["case_id"] = f"dup-{i:02d}"
+            case["split"] = "test"
+            case["stratum"] = "S6"
+            case["group"] = {"session_id": "one-session", "task_id": "one-task",
+                             "pair_group_id": None}
+            cases.append(case)
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as handle:
+            for case in cases:
+                handle.write(json.dumps(case, sort_keys=True) + "\n")
+            path = Path(handle.name)
+        try:
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), str(path), "--min-test-per-stratum", "20"],
+                capture_output=True, text=True)
+        finally:
+            path.unlink()
+        self.assertIn("coverage.test_stratum", result.stdout,
+                      "20 cases from one task must not satisfy a 20-task minimum")
+        self.assertIn("1 distinct sealed test tasks", result.stdout)
+
+    def test_s6_without_s7_control_is_warned(self):
+        """Otherwise a model can satisfy S6 by blocking everything."""
+        cases = []
+        for i in range(3):
+            case = copy.deepcopy(next(c for c in rows("clean.jsonl")
+                                      if c["case_id"] == "fix-test-01"))
+            case["case_id"] = f"s6only-{i:02d}"
+            case["split"] = "test"
+            case["stratum"] = "S6"
+            case["group"] = {"session_id": f"s6only-s{i}", "task_id": f"s6only-t{i}",
+                             "pair_group_id": None}
+            cases.append(case)
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as handle:
+            for case in cases:
+                handle.write(json.dumps(case, sort_keys=True) + "\n")
+            path = Path(handle.name)
+        try:
+            result = subprocess.run(
+                [sys.executable, str(VALIDATOR), str(path), "--min-test-per-stratum", "0"],
+                capture_output=True, text=True)
+        finally:
+            path.unlink()
+        self.assertIn("coverage.missing_control", result.stdout)
+
 
 class AdversarialTests(unittest.TestCase):
     """Bypasses found by attacking the validator, one fixture per weakness.
@@ -253,10 +303,34 @@ class AdversarialTests(unittest.TestCase):
         "adv-source-none-granted": "permission.source",
         "adv-granted-empty-scope": "permission.scope",
         "adv-nonuser-source": "permission.source",
+        # Second campaign, against the checks added after the first.
+        "adv-granted-false-with-scope": "permission.scope",
+        "adv-blank-user-turn-grants": "permission.source",
+        "adv-grant-with-no-task": "permission.source",
+        "adv-data-origin-lies": "consent.data_origin",
     }
 
     # Deliberately not rejected as errors; see the limitations section of the protocol.
     KNOWN_WARNINGS = ["adv-fingerprint-evade"] + [f"adv-stratum-shortcut-{i:02d}" for i in range(6)]
+
+    def test_data_origin_is_required_not_optional(self):
+        """An omitted tag is indistinguishable from a forgotten one."""
+        dropped = copy.deepcopy(next(c for c in rows("clean.jsonl")
+                                     if c["case_id"] == "fix-dev-01"))
+        dropped["provenance"].pop("data_origin")
+        result = self.validate_with(*rows("clean.jsonl"), dropped)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("data_origin", result.stdout)
+
+    def test_second_campaign_closures_still_hold(self):
+        """The four permission and consent bypasses found after the first campaign."""
+        clean = rows("clean.jsonl")
+        for case_id in ("adv-granted-false-with-scope", "adv-blank-user-turn-grants",
+                        "adv-grant-with-no-task", "adv-data-origin-lies"):
+            with self.subTest(case=case_id):
+                result = self.validate_with(*clean, self.adversarial[case_id])
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(self.REGRESSIONS[case_id], result.stdout)
 
     @classmethod
     def setUpClass(cls):

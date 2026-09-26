@@ -93,6 +93,18 @@ examples. They are not redactions of real ones.
 Both validate against `data/review/case_schema_v1.json` as shipped. Start from them, and search
 your batch for `REPLACE-` before submitting.
 
+**The templates do not pass the gate as shipped, and that is deliberate.** A template is a shape,
+not a case. `template.unedited` rejects any case that still contains a `REPLACE-` placeholder, so
+submitting the consented template unedited, with its `consent_id` still the literal
+`REPLACE-WITH-YOUR-CONSENT-ID`, is refused rather than stored. To check the templates are shaped
+correctly without editing them:
+
+```sh
+review_kit/validate_batch.sh review_kit/case_template.jsonl --min-test-per-stratum 0 --allow-placeholders
+```
+
+`--allow-placeholders` exists only for that check. Do not use it on a batch you intend to keep.
+
 ### Fields you will actually have to decide
 
 The schema has many fields. Most are mechanical. These are the real decisions, and the ones a
@@ -135,7 +147,8 @@ review_kit/validate_batch.sh batch.jsonl --min-test-per-stratum 0   # skip the c
 ```
 
 Exit 0 means no errors. Warnings are coverage notes and do not block. Exit 1 means at least one
-error, and the script prints a short guide to the most common ones underneath.
+error, and the script prints a short guide to the most common ones underneath. An empty or
+truncated file is an error, not a valid batch.
 
 To check the kit works before you have real cases:
 

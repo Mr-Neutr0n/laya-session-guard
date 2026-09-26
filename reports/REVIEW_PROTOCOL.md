@@ -330,12 +330,40 @@ generated them.
 
 ## 8. Adversarial audit results
 
-The validator was attacked rather than trusted. Twenty-six synthetic bypass attempts were built,
-each against one check, and each verified to pass the version of the validator at the time. All
-twenty-five that could be closed are now rejected, with a regression test naming the code that
-closes each one.
+The validator was attacked rather than trusted. In two campaigns, 30 synthetic bypass attempts were
+built, each verified to pass the validator at the time it was written. **29 are now rejected**, with
+a regression test naming the code that rejects each one. The one that is not is a documented
+limitation.
 
-Reproduced and fixed:
+The second campaign was run after the review kit, the `eval_rows` instrumentation, and the S6/S7
+synthetic checks had all landed, so it attacked the checks added since the first:
+
+| Area | Bypass | Now caught by |
+| --- | --- | --- |
+| Permission | `granted: false` with a non-empty `scope` and label `allow`, claiming and denying an authorization at once | `permission.scope` |
+| Permission | `source: direct_user` where the only user turn is whitespace, so a blank turn carries the grant | `permission.source` |
+| Permission | `source: direct_user` with a blank `authorized_task`, a grant with nothing to compare against | `permission.source` |
+| Provenance | `data_origin` omitted entirely, so the synthetic tag can be dropped silently | `schema.required` |
+| Provenance | a synthetic case tagged `data_origin: consented` | `consent.data_origin` |
+| Coverage | 20 sealed-test S6 cases from a single session satisfying a 20-case minimum | `coverage.test_stratum` now counts distinct tasks |
+| Coverage | sealed-test `S6` present with no `S7` control, satisfiable by blocking everything | `coverage.missing_control` |
+| Review kit | an empty or truncated batch validating as a clean set | `batch.empty` |
+| Review kit | **the shipped template validating as a submittable batch, including a `consented_session` row whose `consent_id` was the literal `REPLACE-WITH-YOUR-CONSENT-ID`** | `template.unedited` |
+
+That last one is the one that mattered. The template was shipped as a shape, and the gate accepted
+it, so an unedited placeholder capture would have been stored as consented data. `template.unedited`
+now rejects any case still containing a `REPLACE-` placeholder, and `--allow-placeholders` exists
+only for checking that the shipped templates are shaped correctly. A template is a shape, not a case.
+
+Checks that survived the second campaign unchanged, and now have fixtures for the gaps rather than
+only the happy path: `context.omitted_events` in both directions including an absurd
+`omitted_events` of 10^9, and `shortcut.incomplete_is_review`.
+
+Three false positives were also introduced by the audit's own new checks and then fixed: a
+single-label stratum and a single-case dev slice each scored 100% one-bit by construction, and a
+test searched for the wrong phrase in the validator's output.
+
+Reproduced and fixed in the first campaign:
 
 | Area | Bypass | Now caught by |
 | --- | --- | --- |
