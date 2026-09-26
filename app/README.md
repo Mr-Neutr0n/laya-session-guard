@@ -15,3 +15,20 @@ Open `http://127.0.0.1:8765`. The app loads `data/wikirace/graph.json` and `data
 Benchmark mode keeps the published eight-hop rules. Explore mode allows 16 hops and excludes previously visited articles before selecting up to 12 outgoing links. Only Explore passes the last three visited titles to the model; Benchmark omits race history so its input matches the Kaggle evaluation. The Kaggle results shown above the race apply only to Benchmark mode.
 
 `/api/races` lists the evaluation routes, checkpoint availability, and recorded timing. `POST /api/step` accepts `{"model":"base","current":0,"target":1,"visited":[0],"mode":"explore"}` and returns a legal next article, all candidate probabilities, and model inference time. Omit `mode` for Benchmark rules. `/api/timing` returns observed p50 and p95 inference time for each checkpoint. Timing starts after lazy loading, so it excludes model download/load, browser work, and page fetch time.
+
+## Local smoke tests
+
+Both need a running server and the two checkpoints. They exercise real inference, not mocks.
+
+```sh
+# API races through both modes, asserting hop limits, no-repeat rules, and legal candidates.
+.venv/bin/python scripts/race_smoke.py http://127.0.0.1:8765 0
+
+# Real headless Chrome, driven over the DevTools protocol. Needs Deno and Chrome.
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new \
+  --remote-debugging-port=9333 --user-data-dir=/tmp/wikirace-chrome about:blank &
+deno run --allow-net scripts/browser_check.ts http://127.0.0.1:8765
+```
+
+`browser_check.ts` compares the rendered benchmark panel with `/api/races` and checks that the
+hop count in each lane matches the trail and the mode limit.
