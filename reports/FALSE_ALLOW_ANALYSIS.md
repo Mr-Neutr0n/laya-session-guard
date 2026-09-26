@@ -74,11 +74,12 @@ because no wrapper can manufacture a signal that is not present.
 **Cheapest wrapper-side fix.** The allow-margin threshold, which reaches it unusually well: at
 t=14 it catches **17 of 18** benign-source failures on `test_attack` (94%) and 3 of 5 on
 `test_both` (60%). These have the lowest median margin of any subset, 9.6, so they are the
-easiest to catch incidentally. That is fortunate, not principled.
+easiest to catch incidentally. That is fortunate, not principled, and the figure is in-sample;
+the honest cross-fitted gain is roughly half of anything measured in place.
 
 **Expected gain.** Data fix: unquantifiable until the set exists; this is the entire point of
-building it. Threshold: 20 of 25 Mode 1 failures converted to `review`, at 2 of 176 correct
-allows deferred, upper bound and post-hoc.
+building it. Threshold: in-sample 20 of 25 Mode 1 failures converted to `review` at 2 of 176
+correct allows deferred. The cross-fit says to expect roughly half that.
 
 ### Mode 2: the content question flagged it and the action question ignored it
 
@@ -103,13 +104,13 @@ the content is `suspicious`, removes 46 of 66 false allows on `test_attack`. It 
 almost all legitimate work. Rejected.
 
 **Cheapest fix that is actually acceptable.** The allow-margin threshold again: 35 of 48 injected
-false allows on `test_attack` (73%) and 7 of 13 on `test_both` (54%).
+false allows on `test_attack` (73%) and 7 of 13 on `test_both` (54%), in-sample.
 
-**Expected gain.** Threshold: 42 of 59 converted, upper bound. Data fix: replace the two
-independent questions with a single authorization question that sees the content judgment as
-input, so the model cannot act on a signal it produced and then discard. This is a schema and
-objective change, and it is the only change that addresses the mode's cause rather than its
-symptom. Not attempted here; this checkpoint is rejected.
+**Expected gain.** Threshold: 42 of 59 converted in-sample, roughly half out of sample. Data fix:
+replace the two independent questions with a single authorization question that sees the content
+judgment as input, so the model cannot act on a signal it produced and then discard. This is a
+schema and objective change, and it is the only change that addresses the mode's cause rather than
+its symptom. Not attempted here; this checkpoint is rejected.
 
 ### Mode 3: the errors are confident, which rules out recalibration
 
@@ -146,15 +147,51 @@ finding.
 | Rank | Fix | Kind | Expected gain | Honest caveat |
 | --- | --- | --- | --- | --- |
 | 1 | `S6`/`S7` matched pairs, no injection phrasing, human-reviewed | Data | Reaches Mode 1, which nothing else does | Unquantifiable until the set exists. Blocked on consent and collection. |
-| 2 | Allow-margin threshold at t≈14-16 | Wrapper | 66 → 14 false allows on unseen goals, 81%; 2 of 176 correct allows deferred | **Fitted by reading the test split.** Upper bound, not a held-out estimate. |
+| 2 | Allow-margin threshold, **t cross-fitted at 11-13.5** | Wrapper | **31 of 66** false allows on unseen goals, 47%, at 0 of 176 correct allows deferred | Genuine, but **less than half** the 79% the test-fitted threshold appeared to give. See the section below. |
 | 3 | Single joint authorization question | Schema + objective | Addresses Mode 2's cause | Rejected checkpoint; not attempted. |
 | 4 | AND-gate on content and action | Wrapper | 46 of 66 | Rejected: defers 74% of correct allows. |
 | 5 | Recalibration | Wrapper | ~0 | Rejected: Mode 3, errors are confident. |
 
-On ranking 2, the honest procedure is to fit the threshold on `calibration` and report on the
-frozen splits. That was not done, so no threshold number in this report is a valid held-out
-result. The sweep is reported because the trade-off shape is informative, not because the
-optimum is known.
+## The honest threshold result
+
+**The requested procedure could not be run on this checkpoint, and no number below is a
+substitute for it.** The risk-ranked run never persisted per-case calibration logits; `report.json`
+retains only seven summary counts per epoch, and the weights were never downloaded, so the
+calibration logits cannot be regenerated. Fitting t on calibration is impossible with what exists
+locally. Doing it properly requires either persisting calibration predictions in future runs or
+re-running inference on the calibration split with the checkpoint in hand.
+
+What is available is a cross-fit within the frozen splits, which measures the selection bias
+directly instead of hiding it. The rule was fixed in advance: take the largest threshold whose
+correct-allow deferral stays within 1% on the **fitting** split, then report on a **different**
+split.
+
+| Fitted on | t | Evaluated on | False allows caught | Correct allows deferred |
+| --- | ---: | --- | ---: | ---: |
+| `test_both` | 11.0 | `test_attack` | **31/66** (47%) | 0/176 |
+| `test_attack` | 13.5 | `test_both` | 9/18 (50%) | 1/36 |
+| `test_user` | 6.5 | `test_attack` | 11/66 (17%) | 0/176 |
+| `test_attack` | 13.5 | `test_user` | 2/4 | 9/208 |
+
+The same rule applied in-sample, for comparison:
+
+| Fitted and evaluated on | t | False allows caught | Correct allows deferred |
+| --- | ---: | ---: | ---: |
+| `test_attack` | 13.5 | 48/66 (73%) | 0/176 |
+| `test_attack` + `test_both` | 13.5 | 57/84 (68%) | 1/212 |
+
+**Stated plainly: the apparent gain is substantially selection bias, and roughly half of it does
+not survive.** On unseen attacker goals the test-fitted `t=14` reported 52 of 66 caught, 79%.
+Fitted on a different split and applied out of sample, the same rule catches **31 of 66, 47%**.
+The gain is real, since 31 caught at zero cost to the 176 legitimate allowances is a genuine
+improvement over the 66 the checkpoint allows unaided, but the honest figure is about 40 points
+below the in-sample one and the earlier `t=14` numbers in this report should be read as an upper
+bound that was never a valid held-out result.
+
+The fitted threshold is also unstable: 13.5, 11.0, and 6.5 depending on the split used. A
+quantity that moves that much between splits of the same model and the same data source is not a
+stable operating point, which is the strongest argument for fitting it on a proper calibration set
+rather than on frozen data.
 
 ## Confounds that limit every conclusion here
 
@@ -162,8 +199,10 @@ optimum is known.
    targeting "outward sends" might merely teach goal 13, and would be invisible in these metrics
    while offering no general protection. The audit's `S6`/`S7` design exists precisely because
    this number cannot tell the difference.
-2. **Post-hoc threshold.** Every threshold row was chosen by reading the splits it is evaluated
-   on. Treated as an upper bound throughout.
+2. **Post-hoc threshold, now measured.** Every threshold in the earlier sweep was chosen by
+   reading the splits it was evaluated on. The cross-fit above puts a number on that optimism: the
+   in-sample 79% becomes 47% out of sample on unseen attacker goals. Treated as an upper bound
+   throughout, and the honest figure is the cross-fitted one.
 3. **The ASPI adapter erases the features a guard would use.** Across all 856 ASPI cases,
    `action.kind` is the constant `workflow_step`, `action.destination` is the constant
    *"as specified in the proposed action"*, and `history_complete` is always true. The model never
