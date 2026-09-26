@@ -144,9 +144,14 @@ with `python3 kaggle/package_wikirace_results.py` and push with
 
 ## Known follow-ups, not blockers
 
-- The Hugging Face model card links to `https://github.com/Mr-Neutr0n/laya-session-guard` and
-  says the code is there. Until this branch is pushed, that path does not contain the Wikiracing
-  files. Either push the branch or drop the claim from the card.
+- The Hugging Face model card no longer claims the code is on the repository's `main`. It now
+  states that the Wikiracing code lives on the unpushed `codex/laya-wikirace` branch, that `main`
+  does not contain these files, and that the evaluation artifacts plus the training entry point are
+  already recoverable from this repository and the training notebook. Card revisions so far:
+  `30408ad` first upload, `fba1fa4` added `evaluation/graph.json`, `510cb4f` added the replay note,
+  `62cdb93` and then `b9a2b03` card-only text fixes. The public results notebook pins `510cb4f`;
+  every file under `evaluation/` is byte-identical across all of those revisions, so the pin still
+  reproduces the published numbers. Only `README.md` changed after `510cb4f`.
 - The Explore mode's model input now includes the last three visited articles, which was not part
   of the published measurements. Benchmark, and therefore every published number, is unchanged.
 - The achievable ceiling is 55 of 60 races. A path-aware shortlist is the next experiment worth

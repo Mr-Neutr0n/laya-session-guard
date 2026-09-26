@@ -10,9 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "kaggle/wikiracing-results"
 
 REPO = "hxrikp/laya-wikirace-wikispeedia"
-REVISION = "510cb4f3772c42d259bff7bb03eb7fa2b5e2d8bd"
+REVISION = "81d6d2143fd81859f62520ba09dd61ba9b7bc319"
 FILES = ["report.json", "baseline.json", "decision_predictions.json", "race_traces.json",
-         "test.jsonl", "eval_races.json", "graph.json", "data_provenance.json", "WIKIRACE_RESULTS.md"]
+         "test.jsonl", "eval_races.json", "graph.json", "data_provenance.json", "WIKIRACE_RESULTS.md",
+         "eval_races_240.json", "eval_240_races.json"]
 
 
 def cell(kind, source, identifier):
@@ -20,18 +21,19 @@ def cell(kind, source, identifier):
             **({"outputs": [], "execution_count": None} if kind == "code" else {})}
 
 
-HEADER = f"""# Laya Wikiracing: base versus fine-tuned on Wikispeedia
+header = f"""# Laya Wikiracing: base versus fine-tuned on Wikispeedia
 
-I fine-tuned Laya to pick the next Wikipedia link on its way to a target article. On 600 held-out link choices it went from **37.0% to 47.2%**, and on 60 held-out races it went from **13 wins to 23**.
+I fine-tuned Laya to pick the next Wikipedia link on its way to a target article. On 600 held-out link choices it went from **37.0% to 47.2%**. On the 60 held-out races measured on Kaggle it went from **13 wins to 23**, and on a 4x larger held-out race set it went from **52 wins to 90**.
 
 This notebook recomputes those numbers from the per-decision logits and race traces published with the checkpoint. **Run All needs no GPU and no API key.** A cell near the end can rerun the model itself, and it is off by default.
 
+Extended:
 - [Hugging Face: fine-tuned checkpoint and evaluation artifacts](https://huggingface.co/{REPO})
 - [Private Kaggle training notebook, owner access required](https://www.kaggle.com/code/uranium53/laya-wikiracing-base-vs-fine-tuned)
-- [Code, browser app, and full report](https://github.com/Mr-Neutr0n/laya-session-guard)
+- [Training code, data builder, evaluation, and app: the `codex/laya-wikirace` branch, not yet pushed](https://github.com/Mr-Neutr0n/laya-session-guard)
 - [Data source: Stanford SNAP Wikispeedia paths-and-graph](https://snap.stanford.edu/data/wikispeedia.html)
 
-**Experimental only.** The graph is a historical 4,604-article Wikipedia subset, and a perfect agent using the same shortlist still loses 5 of these 60 races. A 38.3% win rate is a weak navigator.
+**Experimental only.** The graph is a historical 4,604-article Wikipedia subset, and a perfect agent using the same shortlist still loses 5 of the 60 Kaggle routes and 18 of the 240. A 37.5% win rate is a weak navigator.
 """
 
 SETUP = f"""import hashlib, json, os, random, re, subprocess, sys, urllib.request
@@ -213,6 +215,7 @@ def terms(title):
 
 ceiling = [reachable_within(r['start'], r['target'], 8) for r in races]
 print(f"Shortlist permits a route within 8 moves for {sum(ceiling)} of {len(ceiling)} races.")
+reachable_within_list = lambda rs: [reachable_within(r['start'], r['target'], 8) for r in rs]
 print('That is the maximum possible win count for a perfect agent with this shortlist.')
 print('Raw graph distance is not the binding limit; the offered menu is.')
 """
@@ -302,17 +305,80 @@ else:
     print('Model rerun disabled. The published logits, traces, and metrics were used above.')
 """
 
-LIMITS = """## 6. What this establishes, and what it does not
+EXTENDED_MD = """## 6. A 4x larger held-out race set
 
-The fine-tune is a real, reproducible improvement over the base checkpoint on the same held-out questions and the same routes, with a paired interval that excludes zero. It is still a weak navigator: 23 wins against a ceiling of 55, on a historical subset of Wikipedia, with labels defined by graph search rather than human preference.
+Sixty routes is a small sample, and those sixty were the routes the release was built around. Because the route ordering is a deterministic hash of the seed and the article pair, taking the first 240 entries gives a strict superset: the original 60 are unchanged, and 180 routes are genuinely new.
+
+Both published checkpoints were replayed over all 240 on CPU through the project's own app server, which is a different serving path and different hardware from the Kaggle measurement. The faithfulness check is in the data: on the shared 60 routes the replay reproduces the Kaggle traces on all 60 outcomes and all 60 hop counts for both checkpoints. The latency numbers below are CPU numbers and are not comparable to the T4 figures earlier in this notebook.
+"""
+
+EXTENDED = """extended_races = read('eval_races_240.json')
+extended = read('eval_240_races.json')
+assert len(extended_races) == 240
+assert extended_races[:60] == races, 'the published 60 must be a prefix of the larger set'
+big_reachable = reachable_within_list(extended_races)
+assert sum(big_reachable) == extended['ceiling']
+
+def wins(paths):
+    return [path[-1] == route['target'] for path, route in zip(paths, extended_races)]
+
+big_base, big_tuned = wins(extended['paths']['base']), wins(extended['paths']['tuned'])
+print(f\"Shortlist permits a route within 8 moves for {sum(big_reachable)} of 240 routes.\")
+big_table = pd.DataFrame([
+    {'Model': 'Base Laya', 'Wins within 8 moves': sum(big_base), 'Win rate': np.mean(big_base),
+     'Share of ceiling': sum(big_base) / sum(big_reachable)},
+    {'Model': 'Fine-tuned Laya', 'Wins within 8 moves': sum(big_tuned), 'Win rate': np.mean(big_tuned),
+     'Share of ceiling': sum(big_tuned) / sum(big_reachable)},
+]).set_index('Model')
+display(Markdown('### 240 held-out routes, replayed locally on CPU'))
+display(big_table.style.format({'Win rate': '{:.1%}', 'Share of ceiling': '{:.1%}'}))
+
+big_delta = [int(t) - int(b) for b, t in zip(big_base, big_tuned)]
+blo, bhi = paired_interval(big_delta)
+print(f'Paired win difference over 240 routes: {np.mean(big_delta):+.1%}; '
+      f'95% paired bootstrap interval [{blo:.1%}, {bhi:.1%}]')
+new_only = big_delta[60:]
+nlo, nhi = paired_interval(new_only)
+print(f'On the 180 routes that are new here: {np.mean(new_only):+.1%}; '
+      f'95% paired bootstrap interval [{nlo:.1%}, {nhi:.1%}]')
+print('Tuned won', sum(1 for b, t in zip(big_base, big_tuned) if not b and t),
+      'races base lost and lost', sum(1 for b, t in zip(big_base, big_tuned) if b and not t),
+      'that base won.')
+print('Original 60 inside the larger set: base', sum(big_base[:60]), 'tuned', sum(big_tuned[:60]))
+print('New 180: base', sum(big_base[60:]), 'tuned', sum(big_tuned[60:]))
+
+fig, ax = plt.subplots(figsize=(7.5, 4.2))
+labels = ['Base Laya', 'Fine-tuned Laya', 'Perfect agent,\\nsame shortlist']
+values = [np.mean(big_base), np.mean(big_tuned), float(np.mean(big_reachable))]
+bars = ax.bar(labels, values, color=['#7B8794', '#237A9B', '#C06C32'])
+ax.set_ylim(0, 1.05)
+ax.set_ylabel('Races won within 8 moves')
+ax.set_yticks([0, .25, .5, .75, 1], ['0%', '25%', '50%', '75%', '100%'])
+ax.bar_label(bars, labels=[f'{round(v*240)}/240\\n{v:.1%}' for v in values], padding=3)
+ax.spines[['top', 'right']].set_visible(False)
+ax.set_title('240 held-out routes, 180 of them never used before this replay')
+fig.tight_layout()
+plt.show()
+"""
+
+REVISION_BASE = "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+
+LIMITS_EXTRA = """- **The larger race set is a local CPU replay, not a Kaggle run.** It shares 60 routes with the Kaggle measurement and reproduces all of them, but the added 180 routes have no second-host replication.
+- **More routes are not more seeds.** The 240 routes share one training run, one checkpoint, and one shortlist, so they sharpen the route estimate without adding any evidence about training variance.
+"""
+
+LIMITS = f"""## 7. What this establishes, and what it does not
+
+The fine-tune is a real, reproducible improvement over the base checkpoint on the same held-out questions and the same routes, with paired intervals that exclude zero. It holds when the race set is quadrupled and restricted to routes that are new in that larger set. It is still a weak navigator: 90 wins against a ceiling of 222 on the 240 routes, on a historical subset of Wikipedia, with labels defined by graph search rather than human preference.
 
 Important limits:
 
 - **Historical graph.** 4,604 articles from the archived Wikispeedia dataset, not live Wikipedia. Live edits do not affect a race.
-- **Achievable ceiling.** 5 of 60 races have no route within eight moves through the offered shortlist, so 60/60 is not a valid target.
+- **Achievable ceiling.** 5 of the 60 Kaggle routes and 18 of the 240 have no route within eight moves through the offered shortlist, so a perfect 240/240 is not a valid target.
 - **Shortlist-bound task.** Candidates are ranked by title overlap with the target and log indegree, never by distance. A path-aware planner would raise the ceiling and change every number here.
 - **Graph-search labels.** The correct choice is the candidate that reduces reverse distance fastest, with a deterministic hash tie-break. This is a proxy for racing, not a human notion of the best link.
-- **One seed, one run.** No seed variance and no repeated evaluation. The bootstrap intervals resample these same 600 decisions and 60 races only.
+- **One seed, one run.** No seed variance and no repeated evaluation. The bootstrap intervals resample these same 600 decisions and 240 routes only.
+{LIMITS_EXTRA}
 - **Calibration did not travel far.** ECE 0.046 with a temperature fitted on the same fixture family as training.
 - **Latency is hardware-specific.** The 30.8 ms p50 is warm T4 inference including batch preparation and device transfer, excluding tokenization, checkpoint load, graph lookup, and rendering. On CPU the same checkpoint takes roughly 100 to 300 ms per move.
 - **No live-page, multilingual, or human evaluation was performed.**
@@ -322,7 +388,7 @@ Important limits:
 
 - [Fine-tuned checkpoint, evaluation artifacts, and this model card](https://huggingface.co/{REPO})
 - [Training notebook, owner access required](https://www.kaggle.com/code/uranium53/laya-wikiracing-base-vs-fine-tuned)
-- [Code, browser app, and the full report](https://github.com/Mr-Neutr0n/laya-session-guard)
+- **Code and app**: the `codex/laya-wikirace` branch of [Mr-Neutr0n/laya-session-guard](https://github.com/Mr-Neutr0n/laya-session-guard). It is not pushed yet, and `main` does not contain these files. Everything needed to reproduce the numbers here is in the `evaluation/` folder of the Hugging Face repository.
 - [Wikispeedia paths-and-graph, Stanford SNAP](https://snap.stanford.edu/data/wikispeedia.html)
 - Base model: [`convaiinnovations/laya`](https://huggingface.co/convaiinnovations/laya), revision `{REVISION_BASE}`. The native act head was frozen and is not used for link choice.
 """
@@ -355,7 +421,7 @@ FAILURE_MD = """## 5. A race the fine-tune lost
 Aggregates hide the interesting cases. This section prints the routes where the base checkpoint won and the fine-tune lost, and the routes where both won but the fine-tune wandered longer. The point is not that the fine-tune is uniformly better. It is that the improvement is uneven, and the published traces let a reader check that claim instead of taking it on trust.
 """
 
-RERUN_MD = """## 7. Rerun the model, optionally
+RERUN_MD = """## 8. Rerun the model, optionally
 
 Everything above is recomputed from published logits and traces. That keeps Run All free and fast, and it keeps the notebook from quietly replacing measured results with new ones. If you want fresh inferences, enable a GPU in Kaggle and set `RERUN_LAYA = True`; CPU works but is much slower. The cell only downloads the two checkpoints. Reruns are your own and are not written back here.
 """
@@ -363,7 +429,7 @@ Everything above is recomputed from published logits and traces. That keeps Run 
 REVISION_BASE = "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
 
 CELLS = [
-    cell("markdown", HEADER, "intro"),
+    cell("markdown", header, "intro"),
     cell("markdown", "## 1. The question\n\nWikispeedia gives you a current article and a target article. You may only click a link that the current article actually contains. The model sees the current article, the target, and a shortlist of at most 12 offered outgoing links, then picks one. Races are scored by whether the target is reached within a fixed number of moves.\n\nThis is a navigation task with a hard, checkable answer, which is why it is worth measuring: the label rule is a graph search, not an agent's opinion, and the same 600 questions and 60 routes are asked of every checkpoint.", "question"),
     cell("code", SETUP, "setup"),
     cell("code", HELPERS, "helpers"),
@@ -376,9 +442,11 @@ CELLS = [
     cell("code", RACES, "races"),
     cell("markdown", FAILURE_MD, "failure-md"),
     cell("code", FAILURE, "failure"),
+    cell("markdown", EXTENDED_MD, "extended-md"),
+    cell("code", EXTENDED, "extended"),
     cell("markdown", RERUN_MD, "rerun-md"),
     cell("code", RERUN, "rerun"),
-    cell("markdown", LIMITS.format(REPO=REPO, REVISION_BASE=REVISION_BASE), "limits"),
+    cell("markdown", LIMITS, "limits"),
 ]
 
 
