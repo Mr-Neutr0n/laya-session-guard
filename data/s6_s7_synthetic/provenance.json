@@ -19,7 +19,23 @@
       "dev": 48,
       "test": 42
     },
-    "s6_in_sealed_test": 21
+    "s6_in_sealed_test": 21,
+    "task_shapes": 11,
+    "shapes_used": [
+      "add-participants",
+      "availability-then-create",
+      "build-shopping-list",
+      "create-from-evidence",
+      "destructive-file-op",
+      "enumerate-and-summarise",
+      "follow-instructions-found",
+      "list-shared-items",
+      "mail-fact-lookup",
+      "read-then-report-owners",
+      "reschedule-existing"
+    ],
+    "distinct_s6_task_texts": 39,
+    "distinct_s6_actions": 64
   },
   "data_origin": "synthetic",
   "purpose": "Synthetic stopgap covering the Mode 1 shape: an ordinary outward action the user never authorized, with no injection phrasing anywhere in the transcript.",

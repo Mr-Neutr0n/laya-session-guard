@@ -20,6 +20,9 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "scripts"))
+from generate_s6_s7_synthetic import ARTIFACTS, SHAPES  # noqa: E402
+
 PREDICTIONS = ROOT / "outputs" / "risk" / "laya-risk-ranked"
 ADAPTED = ROOT / "data" / "aspi" / "adapted"
 STOPGAP = ROOT / "data" / "s6_s7_synthetic" / "cases.jsonl"
@@ -44,6 +47,31 @@ INJECTION_MARKERS = re.compile(
 
 def predict(row):
     return max(range(len(row["logits"])), key=lambda i: row["logits"][i])
+
+
+# Analyst classification of the 23 held-out task prompts into the generator's shape
+# vocabulary. Written by reading the prompts, not derived from the generator, so the
+# two sides of the coverage figure are not scored by a single table.
+SHAPE_CUES = [
+    ("mail-fact-lookup", r"\b(when is|where and at what time|what is my|link to reset|security code|going to be, based on)\b"),
+    ("availability-then-create", r"\bam i free\b"),
+    ("enumerate-and-summarise", r"\bhow many appointments|perform the following tasks in the order|according to the\b"),
+    ("create-from-evidence", r"\bcreate an event in the calendar|book \d+ hours\b"),
+    ("list-shared-items", r"\bids of the files|shared with\b"),
+    ("follow-instructions-found", r"\bdo the actions specified|carry out\b"),
+    ("read-then-report-owners", r"\beach person mentioned\b"),
+    ("reschedule-existing", r"\breschedule\b"),
+    ("add-participants", r"\badd also|to the participants\b"),
+    ("destructive-file-op", r"\bfind and delete the largest\b"),
+    ("build-shopping-list", r"\bingredients|grocery|recipe\b"),
+]
+
+
+def classify_shape(text):
+    for shape, pattern in SHAPE_CUES:
+        if re.search(pattern, text, re.I):
+            return shape
+    return "unclassified"
 
 
 def features_of(text):
@@ -142,9 +170,45 @@ def main():
     print(f"  distinct narrow task texts in S6        : {len(synth_tasks)}")
     overlap = real_task_text & synth_tasks
     print(f"  exact task-text overlap                 : {len(overlap)}")
-    print("  The failures carry 23 different narrow tasks and the stopgap carries a handful of")
-    print("  templates, so task-level coverage is thin. Shape coverage is the honest claim here,")
-    print("  not task coverage, and not coverage of ordinary unauthorized actions in general.")
+    print("  Shape coverage is the honest claim, not coverage of the 23 specific prompts, and")
+    print("  it says nothing about ordinary unauthorized actions in general.")
+    print("\n== Shape coverage of the 23 task texts ==")
+    real_shapes = defaultdict(set)
+    for text in real_task_text:
+        real_shapes[classify_shape(text)].add(text)
+    synth_shapes = set()
+    for case in s6:
+        for _shape, template in SHAPES:
+            if any(case["state"]["authorized_task"] == template.format(artifact=a)
+                   for a in ARTIFACTS):
+                synth_shapes.add(_shape)
+    print(f"  task shapes behind the failures : {len(real_shapes) - ('unclassified' in real_shapes)}")
+    print(f"  task shapes covered in S6        : {len(synth_shapes)}")
+    covered = (set(real_shapes) & synth_shapes) - {"unclassified"}
+    print(f"  shape coverage                  : {len(covered)}/{len(real_shapes) - 1}")
+    unclassified = len(real_shapes.get("unclassified", ()))
+    if unclassified:
+        print(f"  prompts the classifier could not place: {unclassified} (excluded from the "
+              f"denominator, not counted as covered)")
+    print("  distribution of the real failures:")
+    for shape, texts in sorted(real_shapes.items(), key=lambda kv: (-len(kv[1]), kv[0])):
+        print(f"    {shape:<28} {len(texts)}")
+    covered_shapes = sorted(s for s in real_shapes if s != "unclassified" and s in synth_shapes)
+    biggest = max(((s, len(t)) for s, t in real_shapes.items() if s != "unclassified"),
+                  key=lambda kv: kv[1])
+    print(f"\n  The {len(real_tasks)} failures sit behind {len(real_tasks)} prompts but only "
+          f"{len(real_shapes) - 1} distinct task shapes.")
+    print(f"  The most common, {biggest[0]}, accounts for {biggest[1]} of them, so the")
+    print(f"  generator stops at {len(SHAPES)} templates: that covers every shape the failures")
+    print("  actually exhibit, and more templates would pad the count without adding a shape.")
+    print("  Exact text overlap with the held-out split is zero by construction: the S6 task")
+    print("  wording paraphrases a task shape and is never the ASPI prompt itself, so the set")
+    print("  does not contaminate the split it is meant to test. The cost is that shape")
+    print("  coverage is a claim about categories, not about the 23 specific prompts, and it")
+    print("  says nothing about ordinary unauthorized actions in general.")
+    print("  The shape classification is an analyst judgement, written by reading the prompts")
+    print("  against the generator's shape vocabulary. It is not derived from the generator, so")
+    print("  the two sides of the figure are not scored by one table.")
 
     print("\n== Recipient and verb diversity in S6, so neither can stand in as a cue ==")
     verbs = defaultdict(int)

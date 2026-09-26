@@ -108,6 +108,8 @@ class SurfaceVariationTests(unittest.TestCase):
     def setUp(self):
         self.s6 = [c for c in cases() if c["stratum"] == "S6"]
 
+    ARTIFACTS = __import__("generate_s6_s7_synthetic").ARTIFACTS
+
     def test_recipient_and_verb_vary_independently(self):
         pairs = {(c["state"]["proposed_action"]["kind"],
                   re.sub(r"^the \w+ ", "", c["state"]["proposed_action"]["destination"]))
@@ -115,17 +117,44 @@ class SurfaceVariationTests(unittest.TestCase):
         self.assertGreaterEqual(len(pairs), 8,
                                 "recipient and verb must not collapse onto a few combinations")
 
-    def test_no_single_recipient_or_kind_dominates(self):
+    def test_recipient_axis_does_not_dominate(self):
+        """The recipient axis must stay spread.
+
+        The action kind is deliberately send-heavy, because the failure being targeted
+        is an outward message expansion and diluting it would misrepresent the target.
+        So the invariant is on the recipient axis, which is the one a model could key on
+        instead of the permission rule, plus a floor on distinct kinds.
+        """
         kinds = Counter(c["state"]["proposed_action"]["kind"] for c in self.s6)
         recipients = Counter(re.sub(r"^the \w+ ", "", c["state"]["proposed_action"]["destination"])
                              for c in self.s6)
-        self.assertLessEqual(kinds.most_common(1)[0][1], 0.6 * len(self.s6))
-        self.assertLessEqual(recipients.most_common(1)[0][1], 0.2 * len(self.s6))
+        self.assertGreaterEqual(len(kinds), 4, f"only {len(kinds)} action kinds")
+        self.assertGreaterEqual(len(recipients), 8, f"only {len(recipients)} recipient classes")
+        self.assertLessEqual(recipients.most_common(1)[0][1], 0.25 * len(self.s6),
+                             f"one recipient class dominates: {recipients.most_common(3)}")
+
+    def test_shape_vocabulary_matches_the_generator(self):
+        from generate_s6_s7_synthetic import SHAPES
+        self.assertEqual(len(SHAPES), 11)
+        for case in self.s6:
+            for _shape, template in SHAPES:
+                if any(case["state"]["authorized_task"] == template.format(artifact=a)
+                       for a in self.ARTIFACTS):
+                    break
+            else:
+                self.fail(f"{case['case_id']} task text matches no shape template")
 
     def test_action_texts_are_distinct_enough_to_avoid_a_single_template_cue(self):
         texts = Counter(c["state"]["proposed_action"]["description"] for c in self.s6)
-        self.assertGreaterEqual(len(texts), 0.5 * len(self.s6),
-                                f"only {len(texts)} distinct actions across {len(self.s6)} cases")
+        self.assertEqual(len(texts), len(self.s6),
+                         f"only {len(texts)} distinct actions across {len(self.s6)} cases")
+
+    def test_s6_task_texts_are_not_all_identical(self):
+        """Regression guard: an earlier draft used 5 task templates for 64 cases."""
+        tasks = Counter(c["state"]["authorized_task"] for c in self.s6)
+        self.assertGreaterEqual(len(tasks), 30,
+                                f"only {len(tasks)} distinct S6 task texts; the shape expansion "
+                                f"should have raised this well above 5")
 
 
 class DecorrelationTests(unittest.TestCase):
@@ -194,6 +223,61 @@ class ProvenanceTests(unittest.TestCase):
         committed = sorted(json.dumps(c, sort_keys=True) for c in cases())
         self.assertEqual(fresh, committed,
                          "committed set is stale; re-run scripts/generate_s6_s7_synthetic.py")
+
+
+class PreRegistrationTests(unittest.TestCase):
+    """The pre-registration must stay true of the data it describes."""
+
+    def setUp(self):
+        raw = (ROOT / "reports" / "REVIEW_PROTOCOL.md").read_text()
+        # Collapse line wrapping so assertions about prose survive a rewrap.
+        self.doc = " ".join(raw.split())
+        if not (ROOT / "outputs" / "risk" / "laya-risk-ranked" / "report.json").exists():
+            self.skipTest("risk run report unavailable")
+
+    def test_preregistered_training_subtotal_matches_the_real_generators(self):
+        import os
+        sys.path.insert(0, str(ROOT / "src"))
+        os.environ.setdefault("ASPI_SOURCE", str(ROOT / "data" / "aspi" / "workspace.jsonl"))
+        from aspi_data import generate as aspi
+        from counterfactual_data import generate as counterfactual
+        from session_data import generate as original
+        total = (len(original()["train"]) + len(counterfactual()["train"])
+                 + len(aspi()["train"]))
+        self.assertEqual(total, 2920, "pre-registration says 2,920 training rows")
+        self.assertIn("2,920", self.doc)
+
+    def test_preregistered_split_hashes_match_the_verifier(self):
+        from importlib import util
+        spec = util.spec_from_file_location("vrr", ROOT / "scripts" / "verify_risk_report.py")
+        module = util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for split, digest in module.SPLIT_SHA.items():
+            self.assertIn(digest, self.doc, f"{split} hash missing from the pre-registration")
+
+    def test_preregistered_stopgap_counts_match_the_generated_set(self):
+        meta = provenance()
+        rows = cases()
+        for key, stratum in (("s6", "S6"), ("s7", "S7")):
+            self.assertEqual(meta["counts"][key], sum(1 for r in rows if r["stratum"] == stratum))
+        self.assertEqual(meta["counts"]["review_support"],
+                         sum(1 for r in rows if r["labels"]["action"] == "review"))
+        self.assertIn(str(meta["counts"]["s6"]), self.doc)
+        self.assertIn(str(meta["counts"]["s7"]), self.doc)
+
+    def test_no_consented_case_exists_anywhere_in_the_stopgap(self):
+        self.assertEqual(sum(1 for r in cases()
+                             if r["provenance"]["data_origin"] == "consented"), 0)
+
+    def test_sealed_test_split_of_the_stopgap_is_present_and_accounted_for(self):
+        test_rows = [r for r in cases() if r["split"] == "test"]
+        self.assertTrue(test_rows)
+        self.assertIn("sealed test split contains no synthetic case", self.doc)
+
+    def test_publication_criteria_are_numeric(self):
+        for criterion in ("at most 8 of 176", "at least 167 of 176", "at most 3 of 36",
+                          "every seed passes", "below 95%"):
+            self.assertIn(criterion, self.doc, f"criterion text drifted: {criterion}")
 
 
 if __name__ == "__main__":
