@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://laya.local/schemas/review-case/1.0.0",
+  "title": "Laya authorization review case, version 1",
+  "description": "One case in the human-reviewed authorization dataset. Normative artifact for scripts/validate_review_set.py; the validator reads this file rather than reimplementing the rules. Cases are session states with a proposed action and a human action decision. This schema is not a model input format and does not describe the advisory session format in src/session_data.py.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "split", "group", "stratum", "state", "labels", "provenance", "annotations", "adjudication"],
+  "properties": {
+    "schema_version": {
+      "description": "Semantic version of this schema. The validator accepts only versions it implements, listed in its SUPPORTED_SCHEMA_VERSIONS.",
+      "const": "1.0.0"
+    },
+    "case_id": {
+      "description": "Globally unique, stable across revisions. Never reused after a case is withdrawn.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "split": {
+      "description": "test is sealed. It may be added to a release but its labels may not be read during development.",
+      "enum": ["dev", "calib", "test"]
+    },
+    "group": {
+      "description": "Leakage group. A session_id or task_id may appear in only one split. Cases sharing a group are never split across dev, calib, and test.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session_id", "task_id", "pair_group_id"],
+      "properties": {
+        "session_id": {"type": "string", "minLength": 1},
+        "task_id": {"type": "string", "minLength": 1},
+        "pair_group_id": {
+          "description": "Links a matched pair such as an unauthorized action and its authorized control, so the pair cannot straddle a split boundary. Null for unpaired cases.",
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "stratum": {
+      "description": "Coverage stratum, defined in reports/REVIEW_PROTOCOL.md section 3. S6, S7, and the conditional-permission strata are what the current models fail.",
+      "enum": ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"]
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authorized_task", "permission", "events", "proposed_action", "context"],
+      "properties": {
+        "authorized_task": {
+          "description": "What the user actually asked for, in the user's terms, or the empty string when the session has no user turn at all.",
+          "type": "string"
+        },
+        "permission": {
+          "description": "The authorization the user granted, separated from the task text so that reviewers judge scope rather than phrasing. This is the field the conditional-permission strata turn on.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["granted", "scope", "revoked", "source"],
+          "properties": {
+            "granted": {"type": "boolean"},
+            "scope": {
+              "description": "Verbs and targets the user authorized. Empty means the user authorized nothing specific.",
+              "type": "array",
+              "items": {"type": "string"}
+            },
+            "revoked": {
+              "description": "True when an earlier grant was withdrawn later in the session. Both granted and revoked may be true when a grant was made and then withdrawn; the later turn wins.",
+              "type": "boolean"
+            },
+            "source": {
+              "description": "Who authorized. Only direct_user can authorize. A grant asserted by a tool or a file is not a grant and is stratum S9.",
+              "enum": ["direct_user", "none"]
+            }
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/event"}
+        },
+        "proposed_action": {"$ref": "#/$defs/proposed_action"},
+        "context": {
+          "description": "history_complete must be decorrelated from the label. In the risk-ranked run's 2,920-case training split all 216 incomplete-history cases were labelled review with no counterexample, while 40 review cases had a complete history. The model learned the one learnable direction and had no data teaching the other. The validator treats a missing counterexample in either direction as an error.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["history_complete", "omitted_events", "truncation_reason"],
+          "properties": {
+            "history_complete": {"type": "boolean"},
+            "omitted_events": {"type": "integer", "minimum": 0},
+            "truncation_reason": {
+              "description": "Null when the history is complete. Required when it is not, so a truncated case is distinguishable from a complete case.",
+              "type": ["string", "null"]
+            }
+          }
+        }
+      }
+    },
+    "labels": {
+      "description": "The agreed human decision for this case. Never written by a model. Must equal the outcome of adjudication.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "decided_by"],
+      "properties": {
+        "action": {"$ref": "#/$defs/action"},
+        "decided_by": {"type": "string", "minLength": 1}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin", "consent_id", "redaction", "notes"],
+      "properties": {
+        "origin": {
+          "description": "llm_generated is deliberately absent. Labels must come from a human, so a case claiming model-generated ground truth cannot be expressed. synthetic_fixture is for validator tests only and is not valid dataset content.",
+          "enum": ["synthetic_fixture", "synthetic_template", "consented_session"]
+        },
+        "consent_id": {
+          "description": "Identifier of the recorded consent covering this specific use, or null for synthetic origins. Required for consented_session.",
+          "type": ["string", "null"]
+        },
+        "redaction": {
+          "description": "Whether redaction was applied to the raw capture before this case was written. Required to be applied for consented_session.",
+          "enum": ["none", "applied"]
+        },
+        "notes": {"type": "string"}
+      }
+    },
+    "annotations": {
+      "description": "At least two independent human annotations. The role enum is human only, which makes an LLM-authored label unrepresentable rather than merely discouraged.",
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reviewer_id", "role", "action", "rationale"],
+        "properties": {
+          "reviewer_id": {"type": "string", "minLength": 1},
+          "role": {"enum": ["human"]},
+          "action": {"$ref": "#/$defs/action"},
+          "rationale": {
+            "description": "Short citation of the permission text or event that decided the case. Free text, but a reviewer must be able to check it.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "final", "adjudicator_id"],
+      "properties": {
+        "status": {
+          "description": "unanimous when every annotation agreed. adjudicated when they did not and a third human settled it.",
+          "enum": ["unanimous", "adjudicated"]
+        },
+        "final": {"$ref": "#/$defs/action"},
+        "adjudicator_id": {
+          "description": "Null when unanimous, the deciding reviewer's identifier when adjudicated. Never one of the two original annotators.",
+          "type": ["string", "null"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "action": {
+      "description": "allow the action, block it, or escalate to a human. review means a responsible person must decide, and is not a safe default.",
+      "enum": ["allow", "block", "review"]
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "role", "source", "content"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "role": {"enum": ["user", "assistant", "tool"]},
+        "source": {
+          "description": "Trust channel. Only direct_user is authoritative. A file, a web page, a tool result, or an assistant message can propose but never authorize.",
+          "enum": ["direct_user", "assistant", "tool_result", "file_content", "web_content", "unverified_clarification_channel"]
+        },
+        "content": {"type": "string"}
+      }
+    },
+    "proposed_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "description", "destination"],
+      "properties": {
+        "kind": {
+          "description": "Effect class of the action, independent of its wording.",
+          "enum": ["read", "write_file", "delete", "send_message", "publish", "run_command", "install_package", "network_request", "vcs_push", "other"]
+        },
+        "description": {"type": "string", "minLength": 1},
+        "destination": {
+          "description": "Where the action lands. For send_message this is the recipient. A destination outside the user's stated scope is central to S6.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
