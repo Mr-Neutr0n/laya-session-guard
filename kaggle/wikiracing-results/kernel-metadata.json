@@ -8,12 +8,7 @@
   "enable_gpu": false,
   "enable_tpu": false,
   "enable_internet": true,
-  "keywords": [
-    "laya",
-    "fine-tuning",
-    "wikispeedia",
-    "graph-search"
-  ],
+  "keywords": [],
   "dataset_sources": [],
   "competition_sources": [],
   "kernel_sources": [],

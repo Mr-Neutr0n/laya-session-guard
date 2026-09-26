@@ -392,7 +392,7 @@ def main():
                 "title": "Laya Wikiracing Base vs Fine Tuned Results", "code_file": "wikiracing-results.ipynb",
                 "language": "python", "kernel_type": "notebook", "is_private": False,
                 "enable_gpu": False, "enable_tpu": False, "enable_internet": True,
-                "keywords": ["laya", "fine-tuning", "wikispeedia", "graph-search"],
+                "keywords": [],
                 "dataset_sources": [], "competition_sources": [], "kernel_sources": [], "model_sources": []}
     (DEST / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     print(f"Wrote {DEST}/wikiracing-results.ipynb with {len(CELLS)} cells")
