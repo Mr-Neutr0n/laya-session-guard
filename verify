@@ -9,3 +9,4 @@ python3 scripts/cover_s6_s7_mode1.py
 python3 scripts/compare_s6_s7_fidelity.py > /dev/null
 python3 scripts/verify_risk_report.py
 python3 scripts/analyze_false_allows.py > /dev/null
+python3 scripts/audit_calibration.py > /dev/null
