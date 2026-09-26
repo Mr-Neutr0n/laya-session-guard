@@ -1,5 +1,7 @@
 # Laya session guard
 
+For the separate Wikipedia racing experiment and app, see [Wikiracing](wikirace/README.md).
+
 Fine-tuning completed and the saved model loads locally. **This checkpoint is not suitable for automatic tool authorization.** On 24 separately written synthetic sessions it detected 4 of 11 suspicious sources, achieved 54.2% action accuracy, and incorrectly allowed two actions. See [the results](reports/RESULTS.md).
 
 Experimental fine-tuning of `convaiinnovations/laya` for coding-session decisions. The input includes the user's task, ordered messages with their sources, a proposed tool action, and explicit history-completeness metadata.

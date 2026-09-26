@@ -1,0 +1,15 @@
+{
+  "id": "uranium53/laya-wikiracing-base-vs-fine-tuned",
+  "title": "Laya Wikiracing Base vs Fine Tuned",
+  "code_file": "wikirace.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [
+    "uranium53/laya-wikirace-data"
+  ],
+  "competition_sources": [],
+  "kernel_sources": []
+}

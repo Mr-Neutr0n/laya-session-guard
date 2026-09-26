@@ -1,0 +1,19 @@
+{
+  "seed": 42,
+  "articles": 4604,
+  "links": 119772,
+  "valid_human_paths": 44280,
+  "target_counts": {
+    "train": 2648,
+    "calibration": 331,
+    "test": 331
+  },
+  "decision_counts": {
+    "train": 6000,
+    "calibration": 600,
+    "test": 600
+  },
+  "eval_races": 60,
+  "source_url": "https://snap.stanford.edu/data/wikispeedia.html",
+  "source_archive_sha256": "97697096f5d2dcb77aa69e3992305c6c561de89edb9fb10b5ad9feaf8ba534d5"
+}

@@ -6,3 +6,8 @@ references/
 reports/remote/
 *.log
 .DS_Store
+data/wikirace/source/
+kaggle/wikirace-dataset/*.jsonl
+kaggle/wikirace-dataset/graph.json
+kaggle/wikirace-dataset/eval_races.json
+kaggle/wikirace-dataset/provenance.json
