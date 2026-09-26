@@ -119,7 +119,9 @@ class Handler(BaseHTTPRequestHandler):
                                          "reason": "No unvisited outgoing links" if mode == "explore"
                                                    else "No outgoing links"})
                 return
-            result = self.server.models.predict(name, graph, current, target, options, visited)
+            # Benchmark keeps the evaluated input: no race history. Explore tells the model where it has been.
+            result = self.server.models.predict(name, graph, current, target, options,
+                                                visited if mode == "explore" else ())
             with self.server.timings_lock:
                 self.server.timings[name].append(result["model_ms"])
             self.json_response(200, {"outcome": "move", "current": current, "target": target,

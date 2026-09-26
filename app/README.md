@@ -12,6 +12,6 @@ LAYA_DEVICE=cpu .venv/bin/python app/server.py
 
 Open `http://127.0.0.1:8765`. The app loads `data/wikirace/graph.json` and `data/wikirace/eval_races.json`. It shows an unavailable checkpoint as such, without substituting a heuristic result. Model files stay in local directories and the server loads each checkpoint on its first move.
 
-Benchmark mode keeps the published eight-hop rules. Explore mode allows 16 hops and excludes previously visited articles before selecting up to 12 outgoing links. The Kaggle results shown above the race apply only to Benchmark mode.
+Benchmark mode keeps the published eight-hop rules. Explore mode allows 16 hops and excludes previously visited articles before selecting up to 12 outgoing links. Only Explore passes the last three visited titles to the model; Benchmark omits race history so its input matches the Kaggle evaluation. The Kaggle results shown above the race apply only to Benchmark mode.
 
 `/api/races` lists the evaluation routes, checkpoint availability, and recorded timing. `POST /api/step` accepts `{"model":"base","current":0,"target":1,"visited":[0],"mode":"explore"}` and returns a legal next article, all candidate probabilities, and model inference time. Omit `mode` for Benchmark rules. `/api/timing` returns observed p50 and p95 inference time for each checkpoint. Timing starts after lazy loading, so it excludes model download/load, browser work, and page fetch time.

@@ -12,6 +12,33 @@ from unittest.mock import patch
 from app.model_adapter import ModelAdapter
 
 
+class RaceHistoryTest(unittest.TestCase):
+    """Explore tells the model where it has been; Benchmark must match the evaluated input."""
+
+    def test_explore_sends_recent_articles_and_benchmark_sends_none(self):
+        seen = {}
+
+        class FakeAgent:
+            def predict(self, model_state, questions):
+                seen.update(model_state)
+                labels = questions["next_link"]["criteria"]
+                return {"answers": {"next_link": {"choice": "link_0",
+                    "probabilities": {name: (1.0 if name == "link_0" else 0.0) for name in labels}}}}
+
+        graph = {"titles": ["A", "B", "C", "Goal"], "links": [[1, 2], [3], [], []],
+                 "indegree": [0, 1, 1, 1]}
+        with tempfile.TemporaryDirectory() as temp:
+            adapter = ModelAdapter()
+            adapter._paths = {name: str(Path(temp, name)) for name in ("base", "tuned")}
+            for path in adapter._paths.values():
+                Path(path).mkdir()
+            with patch.dict(sys.modules, {"laya": types.SimpleNamespace(load=lambda path, device: FakeAgent())}):
+                adapter.predict("base", graph, 2, 3, [1], visited=[0, 1, 2])
+                self.assertEqual(seen["recent_articles"], ["A", "B", "C"])
+                adapter.predict("base", graph, 2, 3, [1])
+                self.assertEqual(seen["recent_articles"], [])
+
+
 class ConcurrentCheckpointLoadTest(unittest.TestCase):
     def test_two_lanes_load_without_overlapping_runtime_initialization(self):
         active = 0

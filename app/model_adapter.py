@@ -36,7 +36,7 @@ class ModelAdapter:
         path = Path(self._paths[name])
         if not path.is_dir():
             raise ModelUnavailable(f"{name.title()} checkpoint is not on this machine")
-        model_state = state(graph, current, target)
+        model_state = state(graph, current, target, visited)
         questions = {QUESTION_ID: question(graph, options)}
         labels = questions[QUESTION_ID]["criteria"]
         with self._locks[name]:
