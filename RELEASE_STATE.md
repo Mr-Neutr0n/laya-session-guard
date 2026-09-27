@@ -29,42 +29,47 @@ can be loaded as a model, which is why it is typed as a dataset rather than a mo
 
 `hxrikp/laya-wikirace-wikispeedia` is unrelated and was not touched.
 
-## Run-to-run variation: the observed range, and a determinism result that did not hold
+## Run-to-run variation: the observed range
 
-**Five executions** of the same code, seed, and data. **Observed range: 33 to 66 of 176 false
-allows on unseen attacker goals, and 7 to 18 of 36 on the both-unseen split.** These are the real
-bounds. Quote the range, not a point estimate.
+**Four executions** of the same code, seed, and data, each with a citable `report.json`. These are
+the only versions quoted here. **Observed range: 33 to 66 of 176 false allows on unseen attacker
+goals, and 11 to 18 of 36 on the both-unseen split.** Real bounds, not a confidence interval, and
+not a promise about future runs.
 
-| Run | Config | test_attack | test_both | Fitted T | Calibration accuracy |
-| --- | --- | ---: | ---: | ---: | ---: |
-| v2 | pre-determinism | 66/176 | 18/36 | 0.5 | 1.000000 |
-| v4 | pre-determinism | 58/176 | 13/36 | 2.18 | 0.998457 |
-| v5 | determinism on | 33/176 | 11/36 | 0.5 | 1.000000 |
-| v7 | determinism on | 36/176 | 7/36 | 2.45 | 0.998457 |
-| v8 | determinism on | 42/176 | 15/36 | 0.5 | 1.000000 |
+| Version | Config | test_attack | test_both | test_user | old_challenge | Fitted T | Calibration acc. | Source |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| v2 | pre-determinism | 66/176 | 18/36 | 4/216 | 7/16 | 0.500 | 1.000000 | `outputs/risk/laya-risk-ranked/report.json` |
+| v4 | pre-determinism | 58/176 | 13/36 | 4/216 | not in report | 2.200 | 0.998457 | `/tmp/v4out` |
+| v5 | determinism on | 33/176 | 11/36 | 4/216 | 7/16 | 0.500 | 1.000000 | `/tmp/v5out` |
+| v8 | determinism on | 42/176 | 15/36 | 5/216 | 6/16 | 0.500 | 1.000000 | current kernel output |
 
-**The determinism flags did not deliver repeatability.** v7 and v8 both ran with
+v6 errored on a syntax error in a generated cell and produced no results. v7's output is no longer
+retrievable, because a later version overwrote it, so it is not quoted rather than cited from
+recollection. v4 predates the fix that writes `old_challenge` into the report, so that cell is
+absent rather than zero.
+
+**Determinism was enabled, and it did not produce repeatability.** v5 and v8 both ran with
 `use_deterministic_algorithms`, `cudnn.deterministic`, no `cudnn.benchmark`, no TF32 and
 `CUBLAS_WORKSPACE_CONFIG` set, and neither warned about an operation lacking a deterministic
-implementation. They still differ by six cases on `test_attack` and eight on `test_both`. The
-flags pin a rerun on the same stack; Kaggle evidently varies the underlying instance, and fp16
-accumulation order stays unpinned. **Treat repeatability as unachieved on this platform, not
-merely undemonstrated.** The earlier "has not yet been demonstrated" was too kind to the evidence.
+implementation. They still differ by nine cases on `test_attack` and four on `test_both`. The flags
+pin a rerun on the same stack; Kaggle evidently varies the underlying instance, and fp16
+accumulation order stays unpinned. **Treat repeatability as unachieved on this platform**, not
+merely undemonstrated.
 
-**The published 0.5 is an unidentifiable fit, not an estimated optimum.** The action temperature
-is 0.5 on v2, v5 and v8, and on all three the model classified its calibration set perfectly, 308
-of 308, at the selected epoch. Cross-entropy on a set the model gets entirely right is minimised by
+**The published 0.5 is an unidentifiable fit, not an estimated optimum.** The action temperature is
+0.5 on v2, v5 and v8, and on all three the model classified its calibration set perfectly, 308 of
+308, at the selected epoch. Cross-entropy on a set the model gets entirely right is minimised by
 sharpening without limit, so the search runs to the floor of the grid and the parameter is not
-identified. v4 and v7, the two runs with exactly one calibration error, fitted 2.18 and 2.45, both
-interior. Read the published 0.5 as degenerate, and do not read the Brier or ECE computed at it as
-a calibration measurement of this checkpoint.
+identified. v4, the one run with exactly one calibration error, fitted 2.20, interior. Read the
+published 0.5 as degenerate, and do not read the Brier or ECE computed at it as a calibration
+measurement of this checkpoint.
 
 Training diverged across runs, not merely scoring: epoch-1 calibration action accuracy ranged
 between 0.976852 and 0.998457. **The verdict is unaffected in every run.** The span is 33 to 66 of
 176 unauthorized actions allowed, every value of which is rejected by a wide margin, for the same
 cause.
 
-## The causal result, and it changes the plan
+## The causal result, and it changes the plan## The causal result, and it changes the plan
 
 **This is the most important measurement in the project.** Probe set pre-registered before it was
 run, in the ASPI workspace schema the checkpoint demonstrably discriminates in, every probe string

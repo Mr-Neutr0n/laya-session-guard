@@ -278,34 +278,25 @@ until they do.
 
 ## Run-to-run variation, and why the write-up is not published yet
 
-Three executions of the same code, seed, and data, differing because fp16 autocast on GPU with no
-determinism flags let training diverge:
+**Four executions** of the same code, seed, and data, each with a citable `report.json`. **Observed
+range: 33 to 66 of 176 false allows on unseen attacker goals, and 11 to 18 of 36 on the both-unseen
+split.**
 
-| Split | v2 | v4 | v5 (deterministic) |
-| --- | ---: | ---: | ---: |
-| `test_user` false allows | 4/216 | 4/216 | 4/216 |
-| `test_attack` false allows | **66/176** | **58/176** | **33/176** |
-| `test_both` false allows | **18/36** | **13/36** | **11/36** |
-| `old_challenge` false allows | 7/16 | 8/16 | 7/16 |
+| Version | Config | test_attack | test_both | test_user | old_challenge | Fitted T | Calibration acc. | Source |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| v2 | pre-determinism | 66/176 | 18/36 | 4/216 | 7/16 | 0.500 | 1.000000 | `outputs/risk/laya-risk-ranked/report.json` |
+| v4 | pre-determinism | 58/176 | 13/36 | 4/216 | not in report | 2.200 | 0.998457 | `/tmp/v4out` |
+| v5 | determinism on | 33/176 | 11/36 | 4/216 | 7/16 | 0.500 | 1.000000 | `/tmp/v5out` |
+| v8 | determinism on | 42/176 | 15/36 | 5/216 | 6/16 | 0.500 | 1.000000 | current kernel output |
 
-**The range is 33 to 66 of 176, not 58 to 66.** A two-run comparison understated the primary
-metric by a factor of two, which is the concrete argument for the 3-seed requirement in section
-10.2 being a floor rather than a formality. The verdict is unaffected: every run in the range is
-rejected by a wide margin, and the cause is the same single attacker goal in all three.
+v6 errored on a syntax error in a generated cell and produced no results. v7's output is no longer
+retrievable, because a later version overwrote it, so it is not quoted rather than cited from
+recollection. v4 predates the fix that writes `old_challenge` into the report, so that cell is
+absent rather than zero.
 
-v5 is the first run with determinism enabled and the first repeatable one. It recorded its
-`determinism` configuration and emitted **no** `does not have a deterministic implementation`
-warning, so every operation it used had a deterministic path. It is not comparable to v2 and v4,
-which ran a different code path; the spread across v2 to v5 is a property of the non-deterministic
-runs, not of the data.
-
-**The v5 kernel was still not made public.** Its markdown asserts 58 to 66 of 176 and 13 to 18 of
-36, the v2-to-v4 range, and v5's own output gives **33 of 176 and 11 of 36**, outside it. The
-range must be widened to cover all three runs and the notebook re-verified before any flip. The
-`old_challenge` regression is fixed and confirmed: v5's report includes `old_challenge` in
-`finetuned` again at 7 of 16, and writes `predictions-old_challenge.json`.
-
-
+The notebook is **not** made public until a run's output is checked against what it asserts. The
+`old_challenge` regression is fixed and confirmed: v8's report includes `old_challenge` in
+`finetuned` again, at 6 of 16, and writes `predictions-old_challenge.json`.
 
 ## The fitted temperature, and why its Brier is worse than no calibration
 
@@ -335,8 +326,9 @@ and no flat surface; there is nothing to estimate.
 | Run | Calibration action accuracy per epoch | Epoch selected | Fitted T | Nature of the fit |
 | --- | --- | ---: | ---: | --- |
 | v2 (published) | ep1 0.998457 (307/308), **ep2 1.000000 (308/308)**, ep3 1.000000 | 2 | 0.5 | **unidentifiable**, at the floor |
-| v4 | ep1 0.976852 (293/308), **ep2 0.998457 (307/308)**, ep3 0.998457 | 2 | 2.200 | identifiable, interior |
-| v5 (deterministic) | **ep1 1.000000 (308/308)**, ep2 1.000000, ep3 1.000000 | 1 | 0.5 | **unidentifiable**, at the floor |
+| v4 | ep1 0.976852 (293/308), **ep2 0.998457 (307/308)**, ep3 0.998457 | 2 | 2.20 | identifiable, interior |
+| v5 | **ep1 1.000000 (308/308)**, ep2 1.000000, ep3 1.000000 | 1 | 0.5 | **unidentifiable**, at the floor |
+| v8 | **1.000000 (308/308)** | 1 | 0.5 | **unidentifiable**, at the floor |
 
 Fitting a temperature minimises cross-entropy on a calibration set, and **if the model classifies
 that set perfectly the loss is minimised by sharpening without limit.** The parameter is then
