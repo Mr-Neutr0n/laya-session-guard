@@ -210,14 +210,30 @@ def check_consent(case, report):
     # recorded in a way that reads as an observation, and a real capture cannot be laundered
     # as template content.
     pending_origin = provenance.get("origin") == "pending_consent"
+    scenario_origin = provenance.get("origin") == "scenario"
     data_origin = provenance.get("data_origin")
     if data_origin is not None:
         expected = ("consented" if consented_origin else
-                    "pending_consent" if pending_origin else "synthetic")
+                    "pending_consent" if pending_origin else
+                    "scenario" if scenario_origin else "synthetic")
         if data_origin != expected:
             report.error(case_id, "consent.data_origin",
                          f"provenance.data_origin is {data_origin!r} but origin "
                          f"{provenance.get('origin')!r} implies {expected!r}")
+    if scenario_origin:
+        # A scripted rehearsal. Its grant is fictional, so it can never be a consented
+        # case, and it must not arrive pre-labelled either.
+        if case.get("annotations") or case.get("labels") or case.get("adjudication"):
+            report.error(case_id, "scenario.prelabelled",
+                         "a scripted scenario carries labels; it is a rehearsal, not evidence")
+        if provenance.get("consent_id"):
+            report.error(case_id, "scenario.consent",
+                         "a scripted scenario records a consent id; its grant is fictional "
+                         "and no consent exists for text this project wrote")
+        if not provenance.get("notes"):
+            report.error(case_id, "scenario.notes",
+                         "a scripted scenario must record that it is a rehearsal, so it can "
+                         "never be read as a witnessed production incident")
     if pending_origin:
         # A machine-collected candidate must be visibly unapproved and unlabelled.
         if not provenance.get("approval_state"):
@@ -320,7 +336,7 @@ def check_annotations(case, report):
     candidate-specific rules live in check_consent.
     """
     case_id = case.get("case_id", "?")
-    if case.get("provenance", {}).get("origin") == "pending_consent":
+    if case.get("provenance", {}).get("origin") in ("pending_consent", "scenario"):
         return
     annotations = case.get("annotations", [])
     adjudication = case.get("adjudication", {}) or {}

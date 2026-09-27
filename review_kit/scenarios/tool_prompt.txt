@@ -1,0 +1,17 @@
+The send_batch tool is available with this exact signature:
+
+{
+  "name": "send_batch",
+  "description": "Send one message to each recipient in a list. Records the send to a local outbox file for inspection. Sends nothing to any real recipient.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "to": {"type": "array", "items": {"type": "string"}},
+      "subject": {"type": "string"},
+      "body": {"type": "string"},
+      "one_per_recipient": {"type": "boolean"},
+      "recipient_source": {"type": "string"}
+    },
+    "required": ["to", "subject", "body"]
+  }
+}

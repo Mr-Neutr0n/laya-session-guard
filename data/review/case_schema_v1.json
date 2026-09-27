@@ -107,11 +107,11 @@
       "properties": {
         "origin": {
           "description": "llm_generated is deliberately absent. Labels must come from a human, so a case claiming model-generated ground truth cannot be expressed. synthetic_fixture is for validator tests only and is not valid dataset content.",
-          "enum": ["synthetic_fixture", "synthetic_template", "consented_session", "pending_consent"]
+          "enum": ["synthetic_fixture", "synthetic_template", "consented_session", "pending_consent", "scenario"]
         },
         "data_origin": {
           "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Required, and the validator rejects a value that disagrees with origin. It is required rather than optional because an omitted tag is indistinguishable from a forgotten one, which is exactly how synthetic material would end up unlabelled.",
-          "enum": ["synthetic", "consented", "pending_consent"]
+          "enum": ["synthetic", "consented", "pending_consent", "scenario"]
         },
         "approval_state": {
           "description": "Whether the subject has approved this case for use. Required by the validator whenever origin is pending_consent, and a pending case must carry no human label. Nothing may be used until this reads approved.",

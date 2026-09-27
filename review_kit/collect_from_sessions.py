@@ -63,6 +63,9 @@ PI_DECISION_TOOLS = {
     "web_search": ("network_request", "make an external request"),
     "web_fetch": ("network_request", "fetch an external URL"),
     "send_email": ("send_message", "send a message"),
+    # The scenario harness mock tool. An outward send to a recipient list is the
+    # decision point the Mode 1 failures are made of.
+    "send_batch": ("send_message", "send a message to each recipient in a list"),
 }
 CODEX_DECISION_NAMES = {
     "shell": ("run_command", "run a shell command"),
@@ -172,9 +175,20 @@ def codex_turns(path):
 
 
 def action_target(name, args):
-    """Best-effort destination, without copying a whole command line."""
+    """Best-effort destination, without copying a whole command line.
+
+    For a message send the body is part of the action's shape, not incidental detail: the
+    Mode 1 failures all script one identical body per recipient, so dropping the body
+    would hide the very feature being targeted. Subject and body are clipped hard.
+    """
     if not isinstance(args, dict):
         args = {"raw": str(args)}
+    if name in ("send_batch", "send_email"):
+        to = args.get("to") or args.get("recipient") or []
+        body = str(args.get("body", ""))
+        subject = str(args.get("subject", ""))
+        one = "one message per recipient" if args.get("one_per_recipient") else ""
+        return f"to {to}; subject {subject}; body {body}; {one}"[:MAX_ACTION_CHARS]
     for key in ("path", "file_path", "filePath", "target_file", "url", "recipient", "to"):
         if args.get(key):
             return str(args[key])[:120]
@@ -185,7 +199,8 @@ def action_target(name, args):
     return command
 
 
-def build_candidate(session_kind, session_key, user_turn, tool, args, index):
+def build_candidate(session_kind, session_key, user_turn, tool, args, index,
+                   provenance="pending_consent"):
     kind, verb = (PI_DECISION_TOOLS if session_kind == "pi" else CODEX_DECISION_NAMES).get(
         tool, (None, None))
     if kind is None:
@@ -219,6 +234,16 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index):
         "use, and two independent human reviewers before it may carry a label. Collected "
         "by review_kit/collect_from_sessions.py; nothing left the machine."
     )
+    rehearsal = provenance == "scenario"
+    if rehearsal:
+        provenance_notes = (
+            "SCRIPTED REHEARSAL SCENARIO. The user turn was written for the harness, so the "
+            "grant is fictional and this is NOT a witnessed production incident and NOT a "
+            "consented capture. The tool call was scripted, not decided by a model. Covers "
+            "the Mode 1 outward-recipient shape. Requires the subject's explicit approval and "
+            "two independent human reviewers before it may carry a label. Nothing left the "
+            "machine: the mock tool writes to a local outbox."
+        )
     case = {
         "schema_version": SCHEMA_VERSION,
         "case_id": case_id,
@@ -243,8 +268,8 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index):
         },
         "labels": None,
         "provenance": {
-            "origin": "pending_consent",
-            "data_origin": "pending_consent",
+            "origin": provenance,
+            "data_origin": provenance,
             "approval_state": "pending_consent",
             "consent_id": None,
             "redaction": "applied",
@@ -259,7 +284,8 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index):
     return case, "kept"
 
 
-def collect(pi_root, codex_root, max_sessions, limit):
+def collect(pi_root, codex_root, max_sessions, limit, provenance="pending_consent",
+            tool_names=None):
     stats = Counter()
     shapes = Counter()
     kept = []
@@ -274,7 +300,11 @@ def collect(pi_root, codex_root, max_sessions, limit):
         try:
             for index, (user_turn, tool, args) in enumerate(reader(path)):
                 stats["decision_points_seen"] += 1
-                case, reason = build_candidate(kind, session_key, user_turn, tool, args, index)
+                if tool_names and tool not in tool_names:
+                    stats["tool_not_in_harness"] += 1
+                    continue
+                case, reason = build_candidate(kind, session_key, user_turn, tool, args, index,
+                                               provenance=provenance)
                 stats[reason] += 1
                 if case:
                     shapes[case["state"]["proposed_action"]["kind"]] += 1
@@ -294,12 +324,23 @@ def main():
     parser.add_argument("--out", type=Path, default=HERE / "draft_batch.jsonl")
     parser.add_argument("--max-sessions", type=int, default=40)
     parser.add_argument("--limit", type=int, default=0, help="stop after N candidates")
+    parser.add_argument("--scenario-root", default=None,
+                        help="collect from a scripted-scenario session root and tag every case "
+                             "as origin=scenario, never as a real consented capture")
+    parser.add_argument("--tools", default=None,
+                        help="comma-separated tool names to keep, for scenario roots")
     parser.add_argument("--dry-run", action="store_true",
                         help="report counts and write nothing")
     args = parser.parse_args()
 
-    kept, stats, shapes, seen_files = collect(args.pi_root, args.codex_root,
-                                              args.max_sessions, args.limit)
+    provenance = "pending_consent"
+    pi_root, codex_root = args.pi_root, args.codex_root
+    tools = None
+    if args.scenario_root:
+        provenance, pi_root, codex_root, tools = "scenario", args.scenario_root, "", {
+            t.strip() for t in args.tools.split(",")} if args.tools else None
+    kept, stats, shapes, seen_files = collect(pi_root, codex_root, args.max_sessions,
+                                              args.limit, provenance=provenance, tool_names=tools)
     print(f"LOCAL ONLY: read {seen_files} session logs under disk, wrote nothing else.",
           file=sys.stderr)
     print(f"  decision points seen : {stats['decision_points_seen']}", file=sys.stderr)
@@ -309,8 +350,11 @@ def main():
         print(f"  dropped {reason:<28} {count}", file=sys.stderr)
     print(f"  kept candidates                {stats['kept']}", file=sys.stderr)
     print("  by action kind:", dict(shapes), file=sys.stderr)
-    print(f"  all candidates are origin=pending_consent, carry no label and no annotation.",
+    print(f"  all candidates are origin={provenance}, carry no label and no annotation.",
           file=sys.stderr)
+    if provenance == "scenario":
+        print("  SCRIPTED REHEARSAL: the user turns are fictional and no tool call here was "
+              "decided by a model. Not consented, not witnessed.", file=sys.stderr)
 
     if args.dry_run:
         print("  dry run: nothing written", file=sys.stderr)

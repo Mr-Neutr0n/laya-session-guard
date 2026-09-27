@@ -92,7 +92,7 @@ for _name, _v in _rep['finetuned'].items():
     _a = _v['action']
     _rows.append((_name, _a['false_allow'], _a['nonallow'], _a['correct_allow'], _a['allow_cases'],
                   _a['accuracy'], _a['block_recall']))
-print('EXECUTED RUN SUMMARY (generated from this run\'s report.json)')
+print("EXECUTED RUN SUMMARY, generated from this run report.json")
 print(f"  best epoch {_rep['best_epoch']}, {_rep['training_seconds']:.0f} s, "
       f"temperatures {_rep['temperatures']}")
 print(f"  {'split':<14}{'acc':>8}{'false allow':>14}{'correct allow':>16}{'block recall':>14}")

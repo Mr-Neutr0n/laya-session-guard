@@ -9,3 +9,8 @@ reports/remote/
 
 # Local session collection output. Derived from private session logs, never committed.
 review_kit/draft_batch.jsonl
+
+# Scenario rehearsal output. Scripted, not real captures. Never committed.
+review_kit/draft_mode1.jsonl
+review_kit/scenarios/rehearsal-sessions/
+review_kit/scenarios/outbox.jsonl

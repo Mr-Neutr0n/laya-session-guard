@@ -142,6 +142,28 @@ class NotebookSummaryTests(unittest.TestCase):
         summary = next(i for i, s in enumerate(sources) if "EXECUTED RUN SUMMARY" in s)
         self.assertGreater(summary, train, "summary cell must run after the training cell")
 
+    def test_every_code_cell_is_valid_python(self):
+        """A generated cell with a syntax error costs a 35-minute GPU run.
+
+        v6 went to ERROR on exactly this: an apostrophe in a print statement in the
+        summary cell made the emitted cell source an unterminated string. Nothing local
+        executed the notebook, so nothing local noticed.
+        """
+        import ast
+        for index, cell in enumerate(self.cells):
+            if cell["cell_type"] != "code":
+                continue
+            ast.parse("".join(cell["source"]))
+        self.assertGreaterEqual(len([c for c in self.cells if c["cell_type"] == "code"]), 2)
+
+    def test_generated_cells_contain_no_escaped_quotes(self):
+        """The generator emits cell source verbatim, so an escape here becomes a bug there."""
+        for cell in self.cells:
+            if cell["cell_type"] != "code":
+                continue
+            source = "".join(cell["source"])
+            self.assertNotIn("\\'", source, f"escaped quote in a generated cell: {source[:80]!r}")
+
     def test_markdown_carries_no_hard_coded_per_run_false_allow_total(self):
         """A bare 'allowed N of M' is the failure mode; the spread sentence is allowed."""
         markdown = "".join(self.cells[0]["source"])
