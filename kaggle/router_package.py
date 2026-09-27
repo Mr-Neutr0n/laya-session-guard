@@ -15,16 +15,24 @@ INTRO = """# Laya arXiv topic router: base versus fine-tuned, on one held-out se
 
 I fine-tuned Laya to route an arXiv preprint to its primary subject area from the
 title and the first 100 words of the abstract, using metadata only from
-`secemp9/arxiv-complete`. This notebook recomputes the base-versus-fine-tuned
-tables from the saved per-item logits of a single run.
+`secemp9/arxiv-complete`. This notebook recomputes the base-versus-fine-tuned tables
+from the saved per-item logits of a single run.
 
-- Dataset: `secemp9/arxiv-complete`, metadata config, pinned revision
+- Checkpoint: [hxrikp/laya-arxiv-topic-router](https://huggingface.co/hxrikp/laya-arxiv-topic-router)
+- Source, tests and full write-up: [Mr-Neutr0n/laya-session-guard](https://github.com/Mr-Neutr0n/laya-session-guard)
+- Dataset: `secemp9/arxiv-complete`, metadata config, revision
+  `cee894837962fede5612cccf2a4c7cacf49b4c3a`
 - Columns read: `paper_id`, `title`, `abstract`, `primary_category`, `license`, `first_version_date`
 - Never read: `paper_text`, `latex`, `source`, `pdf`, `ps`. The 16.08 TB repository is never cloned.
-- Compute: one Mac CPU, no paid service, no GPU.
+- Compute: one Mac CPU, no GPU, no paid service.
+
+**Training stopped on a wall-clock budget, not on a schedule.** The run was capped at
+7,200 seconds: epoch 1 completed all 500 steps, epoch 2 completed 338 of 500 before
+the budget fired. The checkpoint is a partial-schedule artefact.
 
 **Experimental only.** The labels are author-declared arXiv categories, not expert
-annotations, and the window is 2007-2009 metadata."""
+annotations, and the window is 2007-2009 metadata. Nothing here is a safety or
+authorisation claim."""
 
 CELLS = [
     ("markdown", INTRO),
@@ -57,9 +65,29 @@ print('95% bootstrap CI, accuracy: base', [round(v, 4) for v in base['accuracy_c
       'fine-tuned', [round(v, 4) for v in tuned['accuracy_ci95']])
 print('95% bootstrap CI, macro F1: base', [round(v, 4) for v in base['macro_f1_ci95']],
       'fine-tuned', [round(v, 4) for v in tuned['macro_f1_ci95']])
-print('McNemar exact p (paired):', round(RESULTS['paired']['p_value'], 6))
+print('McNemar exact p (paired): %.3e' % RESULTS['paired']['p_value'])
 print('base-only correct', RESULTS['paired']['base_only_correct'],
       'tuned-only correct', RESULTS['paired']['tuned_only_correct'])"""),
+    ("markdown", """## Calibration: which numbers the temperature can and cannot move
+
+Each model gets one scalar temperature fitted on a separate 400-item calibration split,
+by minimising the negative log likelihood of the correct class over **raw logits**.
+
+Temperature scaling is defined as `softmax(z / T)`. An earlier version of this
+analysis passed an already-normalised probability vector into the fit, which fits the
+log-probability family, where the transform is the identity because `p / T`
+renormalises back to `p`. That path reported base ECE 0.51 and Brier 1.04 with the
+temperature pinned at the edge of the search grid. Those confidence figures were
+artefacts of the wrong objective.
+
+A positive scalar cannot change an argmax, so **accuracy, macro F1, macro precision,
+macro recall, per-class precision/recall/F1, the confusion matrices, the bootstrap
+intervals and the McNemar test are identical under any positive temperature**.
+**ECE and Brier are not invariant.** The accuracy claims below were never affected by
+the correction; the confidence figures were."""),
+    ("code", """for name, report in (('base', base), ('finetuned', tuned)):
+    print(f"{name}: temperature {report['temperature']:.2f}, calibration NLL "
+          f"{report['calibration_nll']:.3f}, ECE {report['ece']:.4f}, Brier {report['brier']:.4f}")"""),
     ("markdown", "## Per-class scores on the held-out split"),
     ("code", """out = ['| subject area | n | base P | base R | base F1 | tuned P | tuned R | tuned F1 |',
        '| --- | --- | --- | --- | --- | --- | --- | --- |']
@@ -79,8 +107,25 @@ print('\\n'.join(out))"""),
 print('base'); show(base['confusion_matrix'])
 print()
 print('fine-tuned'); show(tuned['confusion_matrix'])"""),
-    ("markdown", "## Latency on this machine"),
-    ("code", """for name, report in (('base', base), ('fine-tuned', tuned)):
+    ("markdown", "## Title-only ablation"),
+    ("code", """if 'ablation_title_only' in RESULTS:
+    ab = RESULTS['ablation_title_only']
+    print(ab['description'])
+    for name in ('base', 'finetuned'):
+        r = ab[name]
+        print(f"{name}: accuracy {r['accuracy']:.4f}, macro F1 {r['macro_f1']:.4f}, "
+              f"ECE {r['ece']:.4f}, mean tokens {r['mean_tokens']}")
+    print('Most of the gain survives removing the abstract, so much of the improvement is a')
+    print('shift in how title cues are weighted rather than new subject knowledge.')
+else:
+    print('no ablation recorded in this report')"""),
+    ("markdown", """## Latency on this machine
+
+Measured in a dedicated pass on an otherwise idle machine, separate from the training
+run. The first batch of a pass is a cold start and is excluded from the steady-state
+mean, which is why the training run's batch-8 mean was several times the batch-1
+per-request cost."""),
+    ("code", """for name, report in (('base', base), ('finetuned', tuned)):
     batched, single = report['batched_latency'], report.get('batch1_latency', {})
     print(f"{name}: batch of 8 {batched['ms_per_example_mean']:.0f} ms/example mean, "
           f"p95 {batched['ms_per_example_p95']:.0f} ms; batch of 1 "
@@ -98,6 +143,7 @@ print()
 for rule in PROVENANCE['selection_rules']:
     print('-', rule)"""),
     ("markdown", "## Recompute a score from the saved logits"),
+
     ("code", """import math
 
 def softmax(values, temperature):
@@ -113,7 +159,7 @@ def accuracy(report, rows):
         hits += int(max(range(len(probs)), key=lambda i: probs[i]) == item['label'])
     return hits / len(rows)
 
-for name, report in (('base', base), ('fine-tuned', tuned)):
+for name, report in (('base', base), ('finetuned', tuned)):
     rows = RESULTS['predictions'][name]
     print(name, 'recomputed accuracy', round(accuracy(report, rows), 4),
           'reported', round(report['accuracy'], 4))"""),
@@ -135,22 +181,27 @@ def build(results_path=RESULTS, provenance_path=PROVENANCE, output=None):
         else:
             cells.append({"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [],
                           "source": source.strip().splitlines(True)})
-    # Embed the artefacts so Run All is self-contained and offline.
+    # Embed the artefacts so Run All is self-contained and offline. The JSON text
+    # is embedded as a Python string literal, so the written file parses as an object.
+    embedded_results = json.dumps(results)
+    embedded_provenance = json.dumps(provenance)
     cells.insert(1, {"cell_type": "code", "execution_count": None, "metadata": {}, "outputs": [],
                      "source": ["from pathlib import Path\n",
-                                f"Path('router_results.json').write_text({json.dumps(json.dumps(results))!r})\n",
-                                f"Path('router_provenance.json').write_text({json.dumps(json.dumps(provenance))!r})\n"]})
+                                f"Path('router_results.json').write_text({embedded_results!r})\n",
+                                f"Path('router_provenance.json').write_text({embedded_provenance!r})\n"]})
     notebook = {"nbformat": 4, "nbformat_minor": 5,
                 "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
                              "kaggle": {"language": "python", "kernelType": "notebook"}},
                 "cells": cells}
-    target = Path(output or ROOT / "kaggle" / "arxiv_router.ipynb")
+    target = Path(output) if output else ROOT / "kaggle" / "router" / "arxiv_router.ipynb"
+    target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(notebook, indent=1))
-    metadata = {"id": "uranium53/laya-arxiv-topic-router", "title": "Laya arXiv Topic Router: Base vs Fine-tuned",
+    metadata = {"id": "uranium53/laya-arxiv-router-base-vs-fine-tuned",
+                "title": "Laya arXiv Router Base vs Fine-tuned",
                 "code_file": target.name, "language": "python", "kernel_type": "notebook",
                 "is_private": False, "enable_gpu": False, "enable_internet": False,
                 "dataset_sources": [], "competition_sources": [], "kernel_sources": []}
-    (target.parent / "kernel-metadata.router.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (target.parent / "kernel-metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
     return target
 
 

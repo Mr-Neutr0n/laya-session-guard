@@ -89,7 +89,7 @@ def evaluate(model, items, device, pad, batch_size=8, tag=""):
             chunk = items[start:start + batch_size]
             started = time.perf_counter()
             logits, _ = model(*collate(chunk, pad, device))
-            latency.record((time.perf_counter() - started) * 1000.0)
+            latency.record((time.perf_counter() - started) * 1000.0, examples=len(chunk))
             logits = logits.float().cpu()
             if not torch.isfinite(logits).all():
                 raise RuntimeError("non-finite evaluation logits")
@@ -352,6 +352,36 @@ def extras(args, rows, labels, base_dir, base_model, device, pad, report, output
     print("EXTRAS DONE", flush=True)
 
 
+def latency_pass(args, rows, labels, base_dir, device, report, output):
+    """Re-measure inference latency for both checkpoints, with no training load.
+
+    The training run shared this machine with other jobs, so its batched means are
+    not a latency measurement. This pass runs the same 800 held-out items through
+    both checkpoints, batch 8 and batch 1, and reports the steady-state mean with
+    the cold-start batch excluded.
+    """
+    from transformers import AutoTokenizer
+    items = {}
+    for name, directory in (("base", base_dir), ("finetuned", args.model or args.output_dir)):
+        tokenizer = AutoTokenizer.from_pretrained(Path(base_dir, "tokenizer"))
+        items[name] = load_items(tokenizer, rows["test"], labels)
+        pad = tokenizer.pad_token_id
+        model, _ = load_model(directory, device)
+        model.eval()
+        _, batched = evaluate(model, items[name], device, pad, batch_size=8, tag=f"latency-b8-{name}")
+        single = single_example_latency(model, items[name], device, pad, args.latency_sample)
+        report[name]["batched_latency"] = batched.report()
+        report[name]["batch1_latency"] = single.report()
+        report[name]["latency_conditions"] = {
+            "note": "Dedicated pass, no concurrent training; first batch excluded from the mean.",
+            "batch_size": 8, "batch1_sample": args.latency_sample,
+            "mean_sequence_tokens": round(sum(len(i["ids"]) for i in items[name]) / len(items[name]), 1),
+            "load_seconds": None}
+        print("LATENCY", name, json.dumps(report[name]["batched_latency"]), flush=True)
+    output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    print("LATENCY PASS DONE", flush=True)
+
+
 def environment():
     import importlib.metadata
     import torch
@@ -365,7 +395,7 @@ def environment():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("stage", choices=["data", "base", "train", "eval", "all", "extras"])
+    parser.add_argument("stage", choices=["data", "base", "train", "eval", "all", "extras", "latency"])
     parser.add_argument("--data-dir", default="data/router")
     parser.add_argument("--model", default=None, help="checkpoint directory; default is the pinned base model")
     parser.add_argument("--output-dir", default="outputs/laya-arxiv-router")
@@ -433,6 +463,12 @@ def main():
         if Path(args.report).exists():
             report.update(json.loads(Path(args.report).read_text()))
         extras(args, rows, labels, model_dir, model, device, pad, report, output)
+        return
+
+    if args.stage == "latency":
+        if Path(args.report).exists():
+            report.update(json.loads(Path(args.report).read_text()))
+        latency_pass(args, rows, labels, base_model_dir(), device, report, output)
         return
 
     base_rows, base_latency = evaluate(model, prepared["test"], device, pad, tag="base-test")

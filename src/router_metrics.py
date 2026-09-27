@@ -137,29 +137,45 @@ def mcnemar(rows):
 
 
 class Latency:
+    """Wall-clock accounting for inference.
 
-    """Wall-clock accounting for inference, in milliseconds per example."""
+    `record` takes one call's duration and how many examples it covered, because a
+    batched call is not a per-example measurement. The first call of a pass is a cold
+    start and is excluded from the steady-state means.
+    """
 
     def __init__(self):
         self.samples = []
+        self.items = []
         self.started = time.perf_counter()
 
     def time_call(self, function, *args, **kwargs):
         start = time.perf_counter()
         value = function(*args, **kwargs)
-        self.samples.append((time.perf_counter() - start) * 1000.0)
+        self.record((time.perf_counter() - start) * 1000.0)
         return value
 
-    def record(self, milliseconds):
+    def record(self, milliseconds, examples=1):
         self.samples.append(milliseconds)
+        self.items.append(examples)
 
     def report(self):
         if not self.samples:
             return {}
-        ordered = sorted(self.samples)
-        def pct(q):
-            return ordered[min(len(ordered) - 1, max(0, int(q * len(ordered))))]
-        return {"calls": len(ordered), "total_seconds": sum(ordered) / 1000.0,
-                "ms_per_example_mean": sum(ordered) / len(ordered),
-                "ms_per_example_p50": pct(0.50), "ms_per_example_p95": pct(0.95),
+        per_example = [ms / max(1, n) for ms, n in zip(self.samples, self.items)]
+        steady = per_example[1:] if len(per_example) > 1 else per_example
+        steady_calls = self.samples[1:] if len(self.samples) > 1 else self.samples
+        ordered = sorted(per_example)
+
+        def pct(values, q):
+            return values[min(len(values) - 1, max(0, int(q * len(values))))]
+
+        return {"calls": len(self.samples), "examples": sum(self.items),
+                "total_seconds": sum(self.samples) / 1000.0,
+                "ms_per_example_mean": sum(steady) / len(steady),
+                "ms_per_example_p50": pct(ordered, 0.50),
+                "ms_per_example_p95": pct(ordered, 0.95),
+                "ms_per_example_including_cold_start": sum(per_example) / len(per_example),
+                "ms_per_call_mean": sum(steady_calls) / len(steady_calls),
+                "cold_start_excluded": len(self.samples) > 1,
                 "wall_seconds_including_load": time.perf_counter() - self.started}

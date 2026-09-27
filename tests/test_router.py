@@ -239,13 +239,27 @@ class MetricsTests(unittest.TestCase):
         self.assertLess(low, 0.6)
         self.assertGreater(high, 0.6)
 
+    def test_batched_calls_are_reported_per_example(self):
+        latency = metrics.Latency()
+        # Four batches of eight examples, 4000 ms each: 500 ms per example.
+        for _ in range(5):
+            latency.record(4000.0, examples=8)
+        report = latency.report()
+        self.assertEqual(report["examples"], 40)
+        self.assertAlmostEqual(report["ms_per_call_mean"], 4000.0)
+        self.assertAlmostEqual(report["ms_per_example_mean"], 500.0)
+
     def test_latency_report_percentiles(self):
         latency = metrics.Latency()
         for value in (1.0, 2.0, 3.0, 100.0):
             latency.record(value)
         report = latency.report()
         self.assertEqual(report["calls"], 4)
-        self.assertAlmostEqual(report["ms_per_example_mean"], 26.5)
+        self.assertEqual(report["examples"], 4)
+        # The cold-start sample is excluded from the steady-state mean.
+        self.assertAlmostEqual(report["ms_per_example_mean"], 35.0)
+        self.assertAlmostEqual(report["ms_per_example_including_cold_start"], 26.5)
+        self.assertTrue(report["cold_start_excluded"])
         self.assertGreaterEqual(report["ms_per_example_p95"], report["ms_per_example_p50"])
 
 

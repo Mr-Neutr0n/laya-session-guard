@@ -166,9 +166,13 @@ CPU only ({'GPU available' if environment['cuda_available'] else 'no GPU'}).
 | base | {fmt(batched_base.get('ms_per_example_mean'), 0)} | {fmt(batched_base.get('ms_per_example_p95'), 0)} | {fmt(single_base.get('ms_per_example_mean'), 0)} | {fmt(single_base.get('ms_per_example_p95'), 0)} |
 | fine-tuned | {fmt(batched_tuned.get('ms_per_example_mean'), 0)} | {fmt(batched_tuned.get('ms_per_example_p95'), 0)} | {fmt(single_tuned.get('ms_per_example_mean'), 0)} | {fmt(single_tuned.get('ms_per_example_p95'), 0)} |
 
-The two checkpoints share an architecture, so the latency difference is measurement
-noise rather than a property of the fine-tune. No GPU, serving or concurrency
-numbers were measured, and none should be inferred from this table.
+Both passes ran on an idle machine, separately from training, and the first call of
+each is a cold start excluded from the mean. The batch-8 durations are per call and are
+divided by the batch size. The two checkpoints share an architecture, and the ordering
+reverses between the two columns, so the difference between them is run-to-run
+variation and not a property of the fine-tune. Batching buys roughly 20% per example
+over batch 1 on CPU. No GPU, serving or concurrency numbers were measured, and none
+should be inferred from this table.
 
 ## Training
 

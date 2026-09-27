@@ -127,12 +127,16 @@ CPU only (no GPU).
 
 | model | batch 8 ms/example mean | batch 8 p95 | batch 1 ms mean | batch 1 p95 |
 | --- | --- | --- | --- | --- |
-| base | 5386 | 9157 | 486 | 661 |
-| fine-tuned | 6237 | 9289 | 629 | 939 |
+| base | 557 | 717 | 675 | 788 |
+| fine-tuned | 668 | 1007 | 668 | 1108 |
 
-The two checkpoints share an architecture, so the latency difference is measurement
-noise rather than a property of the fine-tune. No GPU, serving or concurrency
-numbers were measured, and none should be inferred from this table.
+Both passes ran on an idle machine, separately from training, and the first call of
+each is a cold start excluded from the mean. The batch-8 durations are per call and are
+divided by the batch size. The two checkpoints share an architecture, and the ordering
+reverses between the two columns, so the difference between them is run-to-run
+variation and not a property of the fine-tune. Batching buys roughly 20% per example
+over batch 1 on CPU. No GPU, serving or concurrency numbers were measured, and none
+should be inferred from this table.
 
 ## Training
 

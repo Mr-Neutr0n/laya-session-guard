@@ -1969,20 +1969,30 @@
       0.5
     ],
     "batch1_latency": {
-      "calls": 40,
-      "ms_per_example_mean": 486.47356144938385,
-      "ms_per_example_p50": 480.1119579933584,
-      "ms_per_example_p95": 660.8338329970138,
-      "total_seconds": 19.458942457975354,
-      "wall_seconds_including_load": 20.28114099999948
+      "calls": 60,
+      "cold_start_excluded": true,
+      "examples": 60,
+      "ms_per_call_mean": 675.1489273054916,
+      "ms_per_example_including_cold_start": 674.1583833671029,
+      "ms_per_example_mean": 675.1489273054916,
+      "ms_per_example_p50": 671.6970830020728,
+      "ms_per_example_p95": 787.9350830044132,
+      "total_seconds": 40.44950300202618,
+      "wall_seconds_including_load": 40.450626833997376
     },
     "batched_latency": {
       "calls": 100,
-      "ms_per_example_mean": 5386.039583390229,
-      "ms_per_example_p50": 5308.287958003348,
-      "ms_per_example_p95": 9157.454375002999,
-      "total_seconds": 538.6039583390229,
-      "wall_seconds_including_load": 741.6919312090031
+      "examples": 800,
+      "examples_per_call": 8,
+      "ms_per_call_mean": 4454.602698212025,
+      "ms_per_call_p50": 4325.411249999888,
+      "ms_per_call_p95": 5732.4595829995815,
+      "ms_per_example_mean": 556.8253372765031,
+      "ms_per_example_p50": 540.676406249986,
+      "ms_per_example_p95": 716.5574478749477,
+      "normalised": "per-call duration divided by examples per call, from the measured totals",
+      "total_seconds": 445.57624603999284,
+      "wall_seconds_including_load": 492.51952387500205
     },
     "brier": 0.6845931786851146,
     "calibration_nll": 1.4876359865926256,
@@ -2881,6 +2891,13 @@
       "math.PR",
       "quant-ph"
     ],
+    "latency_conditions": {
+      "batch1_sample": 60,
+      "batch_size": 8,
+      "mean_sequence_tokens": 330.0,
+      "note": "Dedicated passes on an otherwise idle machine, separate from the training run. The batch-8 durations are per call and are divided by the batch size; the first call is a cold start and is excluded from the mean.",
+      "test_items": 800
+    },
     "macro_f1": 0.3845737811410358,
     "macro_f1_ci95": [
       0.3618265437033246,
@@ -15022,20 +15039,30 @@
       0.66375
     ],
     "batch1_latency": {
-      "calls": 40,
-      "ms_per_example_mean": 629.1468104498563,
-      "ms_per_example_p50": 617.7588330028811,
-      "ms_per_example_p95": 938.9348340046126,
-      "total_seconds": 25.16587241799425,
-      "wall_seconds_including_load": 26.23750245800329
+      "calls": 60,
+      "cold_start_excluded": true,
+      "examples": 60,
+      "ms_per_call_mean": 668.0871687964654,
+      "ms_per_example_including_cold_start": 667.5328152998796,
+      "ms_per_example_mean": 668.0871687964654,
+      "ms_per_example_p50": 646.3192090013763,
+      "ms_per_example_p95": 1108.4380839965888,
+      "total_seconds": 40.05196891799278,
+      "wall_seconds_including_load": 40.05301816699648
     },
     "batched_latency": {
       "calls": 100,
-      "ms_per_example_mean": 6236.554633740016,
-      "ms_per_example_p50": 6079.756708997593,
-      "ms_per_example_p95": 9289.031124993926,
-      "total_seconds": 623.6554633740016,
-      "wall_seconds_including_load": 893.6302247910062
+      "examples": 800,
+      "examples_per_call": 8,
+      "ms_per_call_mean": 5346.9237587474945,
+      "ms_per_call_p50": 4988.109791003808,
+      "ms_per_call_p95": 8052.732542004378,
+      "ms_per_example_mean": 668.3654698434368,
+      "ms_per_example_p50": 623.513723875476,
+      "ms_per_example_p95": 1006.5915677505473,
+      "normalised": "per-call duration divided by examples per call, from the measured totals",
+      "total_seconds": 534.2018595749978,
+      "wall_seconds_including_load": 582.522081957999
     },
     "brier": 0.47490782712774077,
     "calibration_nll": 0.8806761571838454,
@@ -15934,6 +15961,13 @@
       "math.PR",
       "quant-ph"
     ],
+    "latency_conditions": {
+      "batch1_sample": 60,
+      "batch_size": 8,
+      "mean_sequence_tokens": 330.0,
+      "note": "Dedicated passes on an otherwise idle machine, separate from the training run. The batch-8 durations are per call and are divided by the batch size; the first call is a cold start and is excluded from the mean.",
+      "test_items": 800
+    },
     "macro_f1": 0.6214741522915406,
     "macro_f1_ci95": [
       0.5893657628229271,
@@ -16004,6 +16038,7 @@
     "temperature": 0.97
   },
   "head_max_len": 256,
+  "latency_note": "Batch-1 figures were measured in a separate pass because the batched pass and the batched sample could not share one loop. Base and fine-tuned are the same architecture, so any difference between them is run-to-run variation.",
   "limitations": [
     "Labels are arXiv author-declared primary categories, not expert annotations.",
     "The window is 2007-2009 arXiv metadata; the router is not a general 2026 topic router.",
