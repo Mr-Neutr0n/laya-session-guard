@@ -15,6 +15,7 @@ Writes a JSON verdict to stdout. Nothing is uploaded and nothing is trained.
 import argparse
 import json
 import math
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -38,6 +39,50 @@ def held_out_rows(data_dir, labels, per_class=ROWS_PER_CLASS):
 
 def truncate(text, words=100):
     return " ".join(" ".join(text.split()).split(" ")[:words])
+
+
+CARD_SIZE_RE = re.compile(r"`model\.safetensors`, float16, ([\d,]+) bytes")
+CARD_SHA_RE = re.compile(r"sha256\s+([0-9a-f]{64})")
+
+
+def parse_card_checksum(card_text):
+    """The size and hash the card claims for its own weights."""
+    size = CARD_SIZE_RE.search(card_text)
+    sha = CARD_SHA_RE.search(card_text)
+    return {"size_bytes": int(size.group(1).replace(",", "")) if size else None,
+            "sha256": sha.group(1) if sha else None}
+
+
+def hub_lfs_metadata(model, revision):
+    """Size and LFS oid for the weights, read back from the Hub, not from memory."""
+    import json as _json
+    import urllib.request
+    url = f"https://huggingface.co/api/models/{model}/tree/{revision}?recursive=true"
+    request = urllib.request.Request(url, headers={"User-Agent": "laya-router-release-check"})
+    with urllib.request.urlopen(request, timeout=60) as response:
+        entries = _json.loads(response.read())
+    for entry in entries:
+        if entry.get("path", "").endswith("model.safetensors"):
+            lfs = entry.get("lfs") or {}
+            return {"size_bytes": entry.get("size"), "lfs_size": lfs.get("size"),
+                    "lfs_oid": lfs.get("oid"), "path": entry.get("path")}
+    return {}
+
+
+def check_card_checksum(model, revision, local_path):
+    """The card must state the size and hash the Hub actually holds."""
+    card_text = (Path(local_path) / "README.md").read_text()
+    claimed = parse_card_checksum(card_text)
+    hub = hub_lfs_metadata(model, revision)
+    actual_size = hub.get("lfs_size") or hub.get("size_bytes")
+    return {
+        "claimed_size_bytes": claimed["size_bytes"],
+        "hub_size_bytes": actual_size,
+        "size_matches": claimed["size_bytes"] == actual_size,
+        "claimed_sha256": claimed["sha256"],
+        "hub_lfs_oid": hub.get("lfs_oid"),
+        "hash_matches": claimed["sha256"] == hub.get("lfs_oid"),
+    }
 
 
 def run_card_snippet(local_path, config):
@@ -198,6 +243,7 @@ def main():
         "chance": 1.0 / len(labels),
     }
     verdict["card_snippet"] = run_card_snippet(path, config)
+    verdict["card_checksum"] = check_card_checksum(args.model, args.revision, path)
     text = json.dumps(verdict, indent=2, sort_keys=True) + "\n"
     if args.report:
         Path(args.report).write_text(text)

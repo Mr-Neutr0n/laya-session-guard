@@ -87,3 +87,31 @@ class DemoViewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CardChecksumTests(unittest.TestCase):
+    """The card must state the size and hash the Hub actually holds."""
+
+    def test_parses_a_thousands_separated_size_and_the_hash(self):
+        from verify_release import parse_card_checksum
+        card = ("`model.safetensors`, float16, 842,609,220 bytes:\n\n```text\n"
+                "sha256  f2cedceec2b2a56abbb883f0ff51663d16205170c0b9be5ba0e3ecbbebac848b\n```")
+        parsed = parse_card_checksum(card)
+        self.assertEqual(parsed["size_bytes"], 842609220)
+        self.assertEqual(parsed["sha256"],
+                         "f2cedceec2b2a56abbb883f0ff51663d16205170c0b9be5ba0e3ecbbebac848b")
+
+    def test_a_card_without_a_checksum_is_reported_as_missing(self):
+        from verify_release import parse_card_checksum
+        parsed = parse_card_checksum("no checksum here")
+        self.assertIsNone(parsed["size_bytes"])
+        self.assertIsNone(parsed["sha256"])
+
+    def test_published_card_states_the_hub_size(self):
+        from verify_release import parse_card_checksum
+        card = (ROOT / "outputs" / "laya-arxiv-router" / "README.md").read_text()
+        parsed = parse_card_checksum(card)
+        # The real file, as read from the Hub LFS metadata.
+        self.assertEqual(parsed["size_bytes"], 842609220)
+        self.assertEqual(parsed["sha256"],
+                         "f2cedceec2b2a56abbb883f0ff51663d16205170c0b9be5ba0e3ecbbebac848b")
