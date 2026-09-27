@@ -148,7 +148,22 @@ annotations on purpose. Every candidate is tagged `data_origin: pending_consent`
 consent id, or annotations.
 
 Redaction runs before anything is written. Home paths are replaced; credentials, external
-addresses, long digit runs, and IP addresses cause the candidate to be **dropped, not stored**.
+addresses, long digit runs, IP addresses, and identity strings cause the candidate to be
+**dropped, not stored**.
+
+A privacy audit found two real leaks in an earlier version, both now fixed and both covered by
+tests. A live `sk-proj-...` project key passed the gate because the pattern's character class
+excluded hyphens, and the account's given name appeared in 46 cases. The pattern set now covers
+seventeen families including the hyphenated and prefix-scoped forms, and identity strings are
+derived from the local account, the home directory, and the git identity, with `--identity` for
+anything that cannot be derived, which is a given name. **Pass your given name:**
+
+```sh
+python3 review_kit/collect_from_sessions.py --identity "YourGivenName"
+```
+
+Identity derivation deliberately does not split a token on punctuation. An earlier version did,
+and picked `gmail` and `com` out of an email address, which would have dropped ordinary prose.
 
 Before any of this is usable you need to decide two things the collector cannot:
 

@@ -113,6 +113,10 @@
           "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Required, and the validator rejects a value that disagrees with origin. It is required rather than optional because an omitted tag is indistinguishable from a forgotten one, which is exactly how synthetic material would end up unlabelled.",
           "enum": ["synthetic", "consented", "pending_consent", "scenario"]
         },
+        "decision_source": {
+          "description": "Whether a human or a model actually chose the action, as opposed to the harness scripting it. scripted is a rehearsal whose tool call came from scenarios.json and can say nothing about model behaviour. model means a real agent chose to make this call under a user instruction. Required by the validator whenever origin is scenario, so the two can never be pooled.",
+          "enum": ["scripted", "model"]
+        },
         "approval_state": {
           "description": "Whether the subject has approved this case for use. Required by the validator whenever origin is pending_consent, and a pending case must carry no human label. Nothing may be used until this reads approved.",
           "enum": ["pending_consent", "approved", "withdrawn"]

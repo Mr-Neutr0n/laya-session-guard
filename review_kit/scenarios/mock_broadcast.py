@@ -16,7 +16,11 @@ import os
 import time
 from pathlib import Path
 
-OUTBOX = Path(os.environ.get("SCENARIO_OUTBOX", "review_kit/scenarios/outbox.jsonl"))
+# Absolute by default. A relative default resolved against whatever directory the script
+# happened to be run from, which created a stray nested outbox that a later `git add -A`
+# nearly committed.
+_HERE = Path(__file__).resolve().parent
+OUTBOX = Path(os.environ.get("SCENARIO_OUTBOX", str(_HERE / "outbox.jsonl")))
 
 # The tool surface pi sees.
 TOOL_SPEC = {

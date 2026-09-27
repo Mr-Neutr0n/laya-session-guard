@@ -38,14 +38,34 @@ SCHEMA_VERSION = "1.0.0"
 # Redaction is a hard gate here, stricter than the validator's, because this script's
 # whole job is to avoid writing something sensitive in the first place.
 CREDENTIAL_PATTERNS = {
-    "aws_access_key": r"AKIA[0-9A-Z]{16}",
+    # OpenAI, including the project- and org-scoped forms. The previous pattern used
+    # [A-Za-z0-9]{20,} straight after "sk-", which cannot match "sk-proj-..." because the
+    # hyphen is not in the class, so a live project key passed the gate in three fields of
+    # one candidate. The separator set is now explicit.
+    "openai_key": r"\bsk-(?:proj-|ant-|admin-|svcacct-)?[A-Za-z0-9_-]{16,}",
+    "anthropic_key": r"\bsk-ant-[A-Za-z0-9_-]{16,}",
+    "stripe_key": r"\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}",
+    # AWS. Access key ids are a fixed prefix plus uppercase alphanumerics; the secret is a
+    # 40 character base64-ish run that appears after a label.
+    "aws_access_key_id": r"\b(?:AKIA|ASIA|ABIA|ACCA|AIDA|AROA|ANPA|ANVA|AIPA|APKA)[A-Z0-9]{12,}",
+    "aws_secret_access_key": r"(?i)aws[_a-z]{0,12}(?:secret|private)[_a-z ]{0,16}[\"'\s:=]{1,8}[A-Za-z0-9/+=]{40}",
+    # GitHub classic and fine-grained, GitLab, Slack including app tokens and webhooks.
+    "github_token": r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{22,}",
+    "gitlab_token": r"\bglpat-[A-Za-z0-9_-]{16,}",
+    "slack_token": r"\bxox[abprs]-[A-Za-z0-9-]{10,}|\bxapp-[A-Za-z0-9-]{10,}",
+    "slack_webhook": r"https://hooks\.slack\.com/services/[A-Za-z0-9/+_-]{10,}",
+    # Generic authorization headers, whichever scheme.
+    "bearer_token": r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]{16,}",
+    "basic_auth": r"(?i)\bbasic\s+[A-Za-z0-9+/=]{16,}",
+    # Structural material.
     "private_key_block": r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-    "github_token": r"\bgh[pousr]_[A-Za-z0-9]{20,}",
-    "openai_style_key": r"\bsk-[A-Za-z0-9]{20,}",
-    "slack_token": r"\bxox[baprs]-[A-Za-z0-9-]{10,}",
-    "bearer_header": r"(?i)\bbearer\s+[A-Za-z0-9._-]{20,}",
-    "jwt": r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.",
+    "jwt": r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}",
+    "npm_token": r"\bnpm_[A-Za-z0-9]{30,}",
+    "google_api_key": r"\bAIza[0-9A-Za-z_-]{30,}",
+    # Long opaque runs. These over-match on purpose: a git SHA or a base64 asset is not
+    # worth storing in a review batch either, and a false drop is cheap.
     "hex_blob": r"\b[0-9a-fA-F]{40,}\b",
+    "base64_blob": r"\b[A-Za-z0-9+/]{40,}={0,2}",
 }
 EMAIL = re.compile(r"\b[\w.+-]+@([\w-]+\.[\w.]+)\b")
 EMAIL_ALLOWLIST = {"example.com", "example.org", "example.net", "invalid", "test", "localhost"}
@@ -80,6 +100,68 @@ CODEX_DECISION_NAMES = {
 READ_ONLY = re.compile(
     r"^\s*(cat|ls|head|tail|wc|grep|rg|find|which|echo|pwd|date|git\s+(status|log|diff|"
     r"show|branch)|node\s+--version|python3?\s+--version)\b")
+def identity_tokens(extra=()):
+    """Identity strings that must never be stored: who ran the session, and where.
+
+    Derived rather than hard-coded, because hard-coding one developer's name would leave
+    the gate open for everyone else. Sources: the local account name, the home directory
+    name, the git author name and email configured in this repository, and anything the
+    caller passes. Tokens shorter than three characters are ignored, since a two-letter
+    string would match ordinary words.
+    """
+    import getpass
+    import subprocess
+    tokens = set()
+    for value in (getpass.getuser(), Path.home().name):
+        if value and len(value) >= 3:
+            tokens.add(value.lower())
+    for key in ("user.name", "user.email"):
+        try:
+            out = subprocess.run(["git", "config", "--get", key], cwd=HERE.parent.parent,
+                                 capture_output=True, text=True, timeout=5)
+            value = (out.stdout or "").strip()
+            if len(value) >= 3:
+                tokens.add(value.lower())
+                if "@" in value:
+                    tokens.add(value.split("@")[0].lower())
+        except (OSError, subprocess.SubprocessError):
+            pass
+    for value in extra or ():
+        if value and len(value) >= 3:
+            tokens.add(value.lower())
+    # A local account shows up under more than one name. "harikp" also appears as
+    # "Hari" in anything the account owner writes by hand, and a live case body read
+    # "Thanks, Hari" straight through the gate until this was added. So for each token,
+    # also drop the alphabetic run before any digit, and its capitalised form.
+    # Only the alphabetic run of a token, never its pieces. An earlier version split
+    # identities on punctuation and picked up "gmail" and "com" out of the email local
+    # part, which would have dropped ordinary prose mentioning either word.
+    derived = set()
+    for token in list(tokens):
+        if "@" in token:
+            continue
+        alpha = re.match(r"[a-z]+", token.lower())
+        if alpha and len(alpha.group(0)) >= 3:
+            derived.add(alpha.group(0))
+            derived.add(alpha.group(0).capitalize())
+    tokens |= derived
+    # A given name is not derivable. "harikp" does not reveal "Hari", and a live case body
+    # read "Thanks, Hari" through the gate until that was noticed. Pass it with --identity.
+    return sorted(tokens, key=len, reverse=True)
+
+
+IDENTITY_TOKENS = identity_tokens()
+
+
+def identity_reject_reason(text):
+    """Drop anything naming the local account, the home directory, or the git identity."""
+    lowered = text.lower()
+    for token in IDENTITY_TOKENS:
+        if re.search(rf"(?<![A-Za-z0-9]){re.escape(token)}(?![A-Za-z0-9])", lowered):
+            return f"identity:{token}"
+    return None
+
+
 MAX_TURN_CHARS = 600
 MIN_TURN_CHARS = 12
 MAX_ACTION_CHARS = 300
@@ -103,7 +185,7 @@ def redact_reject_reason(text):
         return "long_digits"
     if IPV4.search(text):
         return "ip_address"
-    return None
+    return identity_reject_reason(text)
 
 
 def clean(text):
@@ -200,7 +282,7 @@ def action_target(name, args):
 
 
 def build_candidate(session_kind, session_key, user_turn, tool, args, index,
-                   provenance="pending_consent"):
+                   provenance="pending_consent", decision_source="scripted"):
     kind, verb = (PI_DECISION_TOOLS if session_kind == "pi" else CODEX_DECISION_NAMES).get(
         tool, (None, None))
     if kind is None:
@@ -276,6 +358,10 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index,
             "notes": provenance_notes,
         },
     }
+    # decision_source only distinguishes a rehearsal from a real agent decision, so it is
+    # meaningful on a scenario and absent on a real capture.
+    if rehearsal:
+        case["provenance"]["decision_source"] = decision_source
     # annotations and adjudication are omitted rather than emitted empty. An empty list
     # reads to the schema as a reviewed case with too few labels; absence reads as a
     # candidate that has not been reviewed, which is what it is.
@@ -285,7 +371,7 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index,
 
 
 def collect(pi_root, codex_root, max_sessions, limit, provenance="pending_consent",
-            tool_names=None):
+            tool_names=None, decision_source="scripted"):
     stats = Counter()
     shapes = Counter()
     kept = []
@@ -304,7 +390,8 @@ def collect(pi_root, codex_root, max_sessions, limit, provenance="pending_consen
                     stats["tool_not_in_harness"] += 1
                     continue
                 case, reason = build_candidate(kind, session_key, user_turn, tool, args, index,
-                                               provenance=provenance)
+                                               provenance=provenance,
+                                               decision_source=decision_source)
                 stats[reason] += 1
                 if case:
                     shapes[case["state"]["proposed_action"]["kind"]] += 1
@@ -327,20 +414,34 @@ def main():
     parser.add_argument("--scenario-root", default=None,
                         help="collect from a scripted-scenario session root and tag every case "
                              "as origin=scenario, never as a real consented capture")
+    parser.add_argument("--decision-source", default="scripted",
+                        choices=["scripted", "model"],
+                        help="scripted for a rehearsal whose tool call came from scenarios.json, "
+                             "model for a real agent decision")
+    parser.add_argument("--identity", action="append", default=[],
+                        help="an extra identity string to drop on, repeatable")
     parser.add_argument("--tools", default=None,
                         help="comma-separated tool names to keep, for scenario roots")
     parser.add_argument("--dry-run", action="store_true",
                         help="report counts and write nothing")
     args = parser.parse_args()
 
+    global IDENTITY_TOKENS
+    if args.identity:
+        IDENTITY_TOKENS = identity_tokens(args.identity)
     provenance = "pending_consent"
     pi_root, codex_root = args.pi_root, args.codex_root
     tools = None
     if args.scenario_root:
         provenance, pi_root, codex_root, tools = "scenario", args.scenario_root, "", {
             t.strip() for t in args.tools.split(",")} if args.tools else None
+    if provenance == "scenario":
+        decision_source = args.decision_source
+    else:
+        decision_source = "model"
     kept, stats, shapes, seen_files = collect(pi_root, codex_root, args.max_sessions,
-                                              args.limit, provenance=provenance, tool_names=tools)
+                                              args.limit, provenance=provenance, tool_names=tools,
+                                              decision_source=decision_source)
     print(f"LOCAL ONLY: read {seen_files} session logs under disk, wrote nothing else.",
           file=sys.stderr)
     print(f"  decision points seen : {stats['decision_points_seen']}", file=sys.stderr)
@@ -348,13 +449,22 @@ def main():
                if k not in ("decision_points_seen", "kept")}
     for reason, count in dropped.items():
         print(f"  dropped {reason:<28} {count}", file=sys.stderr)
+    identity_drops = {k: v for k, v in stats.items() if k.startswith("identity:")}
     print(f"  kept candidates                {stats['kept']}", file=sys.stderr)
+    if identity_drops:
+        print("  dropped on identity strings   ", dict(identity_drops), file=sys.stderr)
+    print(f"  identity tokens in force      {IDENTITY_TOKENS}", file=sys.stderr)
     print("  by action kind:", dict(shapes), file=sys.stderr)
-    print(f"  all candidates are origin={provenance}, carry no label and no annotation.",
-          file=sys.stderr)
+    print(f"  all candidates are origin={provenance}, decision_source={decision_source}, "
+          f"carry no label and no annotation.", file=sys.stderr)
     if provenance == "scenario":
-        print("  SCRIPTED REHEARSAL: the user turns are fictional and no tool call here was "
-              "decided by a model. Not consented, not witnessed.", file=sys.stderr)
+        if decision_source == "scripted":
+            print("  SCRIPTED REHEARSAL: the user turns are fictional and no tool call here was "
+                  "decided by a model. Not consented, not witnessed.", file=sys.stderr)
+        else:
+            print("  REAL AGENT DECISION under a user instruction, but the user turn is a "
+                  "scripted scenario, so the grant is fictional. Not consented, not witnessed.",
+                  file=sys.stderr)
 
     if args.dry_run:
         print("  dry run: nothing written", file=sys.stderr)

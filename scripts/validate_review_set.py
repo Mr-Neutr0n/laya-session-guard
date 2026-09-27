@@ -230,6 +230,14 @@ def check_consent(case, report):
             report.error(case_id, "scenario.consent",
                          "a scripted scenario records a consent id; its grant is fictional "
                          "and no consent exists for text this project wrote")
+        source = provenance.get("decision_source")
+        if not source:
+            report.error(case_id, "scenario.decision_source",
+                         "origin is scenario but decision_source is absent; a rehearsal and a "
+                         "real agent decision must never be pooled")
+        elif source not in ("scripted", "model"):
+            report.error(case_id, "scenario.decision_source",
+                         f"decision_source {source!r} is not recognised")
         if not provenance.get("notes"):
             report.error(case_id, "scenario.notes",
                          "a scripted scenario must record that it is a rehearsal, so it can "

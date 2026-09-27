@@ -48,15 +48,78 @@ class RedactionGateTests(unittest.TestCase):
     def setUp(self):
         self.m = load_collector()
 
-    def test_credentials_are_dropped(self):
-        for text, expected in [
-            ("deploy with AKIAIOSFODNN7EXAMPLE now", "credential:aws_access_key"),
-            ("use ghp_abcdefghijklmnopqrstuvwxyz01", "credential:github_token"),
-            ("header Bearer abcdefghijklmnopqrstuvwx", "credential:bearer_header"),
-            ("-----BEGIN RSA PRIVATE KEY----- here", "credential:private_key_block"),
-            ("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc", "credential:jwt"),
-        ]:
-            self.assertEqual(self.m.redact_reject_reason(text), expected, text)
+    def test_every_credential_family_is_covered(self):
+        """One case per family, including the hyphenated forms that caused the audit finding."""
+        cases = {
+            "openai_key": "key sk-proj-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            "anthropic_key": "key sk-ant-0123456789abcdefghijklmnop",
+            "stripe_key": "rk_live_0123456789abcdefghij",
+            "aws_access_key_id": "AKIAIOSFODNN7EXAMPLE",
+            "aws_secret_access_key":
+                "aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "github_token": "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+            "gitlab_token": "glpat-ABCDEFGHIJKLMNOPQRST",
+            "slack_token": "xoxb-123456789012-abcdefghijkl",
+            "slack_webhook": "https://hooks.slack.com/services/T0000/B0000/XXXXXXXXXXXX",
+            "bearer_token": "Authorization: Bearer abcdefghijklmnopqrstuvwxyz",
+            "basic_auth": "Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==",
+            "private_key_block": "-----BEGIN RSA PRIVATE KEY----- here",
+            "jwt": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N",
+            "npm_token": "npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+            "google_api_key": "AIzaSyA0123456789abcdefghijklmnopqrstuv",
+            "hex_blob": "blob " + "a1b2c3d4" * 8,
+            "base64_blob": "blob A1b2C3d4E5f6G7h8I9j0KlMnOpQrStUvWxYz012345",
+        }
+        self.assertEqual(set(cases), set(self.m.CREDENTIAL_PATTERNS),
+                         "a family is unlisted or a test is missing")
+        import re as _re
+        for family, text in cases.items():
+            self.assertIsNotNone(_re.search(self.m.CREDENTIAL_PATTERNS[family], text),
+                                 f"pattern {family} does not match its own sample")
+            got = self.m.redact_reject_reason(text)
+            self.assertIsNotNone(got, f"{family} passed the gate: {text[:40]}")
+            self.assertTrue(got.startswith("credential:"), got)
+
+    def test_hyphenated_and_prefixed_keys_all_drop(self):
+        """The audit finding: [A-Za-z0-9]{20,} after "sk-" cannot match "sk-proj-"."""
+        for text in ("sk-proj-AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHH",
+                     "sk-ant-AAAABBBBCCCCDDDDEEEEFFFF",
+                     "sk-AAAABBBBCCCCDDDDEEEEFFFFGGGG",
+                     "github_pat_11AAAABBBBCCCCDDDDEEEEFFFF",
+                     "glpat-AAAABBBBCCCCDDDDEEEE"):
+            self.assertIsNotNone(self.m.redact_reject_reason(text), text)
+
+    def test_identity_strings_are_dropped(self):
+        """identity_reject_reason reads the module global, so install the tokens on it."""
+        original = self.m.IDENTITY_TOKENS
+        self.m.IDENTITY_TOKENS = self.m.identity_tokens(["Samplegiven"])
+        try:
+            self.assertIn("samplegiven", self.m.IDENTITY_TOKENS)
+            for text in ("committed by samplegiven today", "Signed, Samplegiven",
+                         "samplegiven reviewed this"):
+                self.assertIsNotNone(self.m.identity_reject_reason(text), text)
+            self.assertIsNone(self.m.identity_reject_reason("an unrelated sentence"))
+        finally:
+            self.m.IDENTITY_TOKENS = original
+
+    def test_common_words_are_not_identity_tokens(self):
+        """An earlier derivation split the email and picked up 'gmail' and 'com'."""
+        tokens = self.m.identity_tokens([])
+        for common in ("com", "gmail", "http", "project", "update"):
+            self.assertNotIn(common, tokens, f"'{common}' must not be an identity token")
+        self.assertIsNone(self.m.redact_reject_reason("send it to gmail after the com merge"))
+
+    def test_given_name_must_be_supplied_explicitly(self):
+        """A given name is not derivable from a login, so --identity is the only route."""
+        tokens = self.m.identity_tokens(["Quillpax"])
+        self.assertIn("quillpax", tokens)
+        self.assertIn("Quillpax", tokens)
+        original = self.m.IDENTITY_TOKENS
+        self.m.IDENTITY_TOKENS = tokens
+        try:
+            self.assertIsNotNone(self.m.identity_reject_reason("Thanks, Quillpax"))
+        finally:
+            self.m.IDENTITY_TOKENS = original
 
     def test_external_addresses_and_identifiers_are_dropped(self):
         self.assertEqual(self.m.redact_reject_reason("mail real.person@acmecorp.io"),
@@ -83,7 +146,8 @@ class RedactionGateTests(unittest.TestCase):
                 "please deploy this with AKIAIOSFODNN7EXAMPLE in it", "bash", {"command": "x"}))
             kept, stats, _, _ = self.m.collect(tmp, "", 10, 0)
         self.assertEqual(kept, [])
-        self.assertGreater(stats["credential:aws_access_key"], 0)
+        credential_drops = {k: v for k, v in stats.items() if k.startswith("credential:")}
+        self.assertTrue(credential_drops, f"the secret was not dropped at all: {dict(stats)}")
 
     def test_a_clean_candidate_is_kept(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -167,9 +231,21 @@ class CandidateShapeTests(unittest.TestCase):
 
 class LocalOnlyTests(unittest.TestCase):
     def test_collector_makes_no_network_calls(self):
+        """Bans network modules and calls, not URL text: a regex may legitimately name a
+        Slack webhook host in order to recognise and drop one."""
+        import ast
+        tree = ast.parse(COLLECTOR.read_text())
+        modules = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                modules |= {a.name.split(".")[0] for a in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                modules.add(node.module.split(".")[0])
+        for banned in ("socket", "urllib", "requests", "httpx", "http", "smtplib", "ftplib"):
+            self.assertNotIn(banned, modules, f"collector must not import {banned}")
         source = COLLECTOR.read_text()
-        for banned in ("import socket", "urllib", "requests", "http://", "https://", "urlopen"):
-            self.assertNotIn(banned, source, f"collector must not contain {banned}")
+        for call in ("urlopen(", "urlretrieve(", "socket.create_connection("):
+            self.assertNotIn(call, source, f"collector must not make a call: {call}")
 
     def test_collector_reads_only_the_session_roots(self):
         """Behavioural: a secret planted outside the roots must not reach the output."""
