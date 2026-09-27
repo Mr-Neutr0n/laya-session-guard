@@ -4,6 +4,15 @@
     "temperature_choice": 0.97
   },
   "bare_label_prompt_accuracy": 0.175,
+  "card_snippet": {
+    "found": true,
+    "ok": true,
+    "pinned_revision": "a4cad5ab032df32adfc41e8e9572f65c6f2ab9dd",
+    "pins_a_revision": true,
+    "returncode": 0,
+    "stderr_tail": "Fetching 9 files: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 9/9 [00:00<00:00, 3533.86it/s]",
+    "stdout": "gr-qc {'cond-mat.mes-hall': 0.0001, 'cond-mat.mtrl-sci': 0.0001, 'gr-qc': 0.8464, 'hep-ph': 0.0002, 'hep-th': 0.0355, 'math.AG': 0.0001, 'math.PR': 0.0007, 'quant-ph': 0.1168}"
+  },
   "chance": 0.125,
   "config": {
     "config_temperature_by_options": {
@@ -11,7 +20,7 @@
     },
     "config_temperature_choice_fallback": 0.97,
     "prompt_artifact_published": true,
-    "revision": "a4cad5ab032df32adfc41e8e9572f65c6f2ab9dd",
+    "revision": "6a5f208452f35ad643b573fdaa9793363e280902",
     "temperature_that_laya_will_apply": 0.97,
     "training_schedule_completed": false,
     "training_steps_completed": 838,

@@ -16,6 +16,7 @@ import argparse
 import json
 import math
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -37,6 +38,38 @@ def held_out_rows(data_dir, labels, per_class=ROWS_PER_CLASS):
 
 def truncate(text, words=100):
     return " ".join(" ".join(text.split()).split(" ")[:words])
+
+
+def run_card_snippet(local_path, config):
+    """Execute the usage snippet exactly as the published card prints it.
+
+    The card pins a revision inside its own text, so a pin that predates
+    `router_prompt.json` makes the snippet fail with FileNotFoundError for anyone who
+    copies it. Extracting and running the fenced block is the only way to catch that
+    before publication rather than after.
+    """
+    import re
+    import subprocess
+    card = (Path(local_path) / "README.md").read_text()
+    blocks = re.findall(r"```python\n(.*?)```", card, re.S)
+    if not blocks:
+        return {"found": False, "ok": False, "detail": "no python block in the card"}
+    snippet = blocks[0]
+    pin = re.search(r'revision="([0-9a-f]{40})"', snippet)
+    script = Path(tempfile.mkdtemp()) / "card_snippet.py"
+    script.write_text(snippet)
+    result = subprocess.run([sys.executable, str(script)], capture_output=True, text=True,
+                            cwd=script.parent, timeout=1800)
+    output = result.stdout.strip().splitlines()
+    return {
+        "found": True,
+        "ok": result.returncode == 0,
+        "pinned_revision": pin.group(1) if pin else None,
+        "pins_a_revision": bool(pin),
+        "returncode": result.returncode,
+        "stdout": output[-1] if output else "",
+        "stderr_tail": result.stderr.strip().splitlines()[-1] if result.stderr.strip() else "",
+    }
 
 
 def main():
@@ -164,6 +197,7 @@ def main():
         "bare_label_prompt_accuracy": naive_accuracy,
         "chance": 1.0 / len(labels),
     }
+    verdict["card_snippet"] = run_card_snippet(path, config)
     text = json.dumps(verdict, indent=2, sort_keys=True) + "\n"
     if args.report:
         Path(args.report).write_text(text)

@@ -120,6 +120,12 @@ model weighs title keywords rather than new subject knowledge. The base model is
 essentially unchanged by the removal, which is the expected shape if it was reading
 title cues all along.
 
+The temperature used for this table is the one fitted on the full title-plus-abstract
+calibration split, reused unchanged. It was **not** refitted for the title-only input
+distribution, and no title-only calibration split was built, so the accuracy and macro
+F1 figures are sound while any ECE or Brier quoted beside them is only indicative. The
+ranked numbers, as everywhere else, do not depend on the temperature.
+
 ## Latency
 
 Measured on the run machine, macOS-26.4.1-arm64-arm-64bit, 10 torch threads,
@@ -194,16 +200,6 @@ The dataset compilation carries a CC0 organisational layer, but the papers stay
 under their own per-author licences, and 69% of the kept rows record no licence at
 all. Titles and abstracts are used here as model input, not redistributed: the
 built splits are git-ignored and rebuilt by the script.
-
-## Release verification
-
-An independent review of the published card and checkpoint found four defects, all
-fixed in revision `a4cad5ab032df32adfc41e8e9572f65c6f2ab9dd`: a miscounted column in
-the base model's bias, the upstream base checkpoint's training record inherited into
-the released config, a missing temperature so `laya.load` applied T=1.0, and a usage
-snippet whose criteria were not the prompt the model was trained on. The corrected
-numbers are verified by loading the published revision through `laya` and scoring both
-prompts on 120 held-out rows; see `reports/release_verification.json`.
 
 ## Limitations
 

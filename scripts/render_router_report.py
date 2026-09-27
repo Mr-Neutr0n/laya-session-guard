@@ -156,6 +156,12 @@ model weighs title keywords rather than new subject knowledge. The base model is
 essentially unchanged by the removal, which is the expected shape if it was reading
 title cues all along.
 
+The temperature used for this table is the one fitted on the full title-plus-abstract
+calibration split, reused unchanged. It was **not** refitted for the title-only input
+distribution, and no title-only calibration split was built, so the accuracy and macro
+F1 figures are sound while any ECE or Brier quoted beside them is only indicative. The
+ranked numbers, as everywhere else, do not depend on the temperature.
+
 ## Latency
 
 Measured on the run machine, {environment['platform']}, {environment['torch_threads']} torch threads,
