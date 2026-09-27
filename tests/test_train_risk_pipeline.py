@@ -96,5 +96,63 @@ class ReproducibilityTests(unittest.TestCase):
         self.assertIn("torch.manual_seed(42)", TRAIN_RISK.read_text())
 
 
+class NotebookSummaryTests(unittest.TestCase):
+    """The notebook's prose must not assert per-run numbers.
+
+    Hard-coded counts are why this write-up contradicted its own output twice: once by
+    quoting a single run, once by quoting a two-run range that a third run fell outside.
+    The fix is that the run generates its own table and the prose carries only
+    observations about repeatability, explicitly not bounds on any run.
+    """
+
+    def setUp(self):
+        import json
+        self.notebook = ROOT / "kaggle" / "risk" / "risk.ipynb"
+        if not self.notebook.exists():
+            self.skipTest("notebook not generated")
+        self.cells = json.loads(self.notebook.read_text())["cells"]
+
+    def test_markdown_declares_that_its_numbers_are_generated(self):
+        markdown = "".join(self.cells[0]["source"])
+        self.assertIn("No per-run count appears in this prose", markdown)
+
+    def test_markdown_does_not_claim_a_range_bounds_any_run(self):
+        markdown = "".join(self.cells[0]["source"])
+        self.assertIn("is **not a bound on this or any future run**", markdown)
+        self.assertIn("before determinism was enabled", markdown,
+                      "the observed spread must be attributed to the pre-fix runs")
+
+    def test_markdown_states_the_verdict_is_unaffected_in_every_run(self):
+        markdown = "".join(self.cells[0]["source"])
+        self.assertIn("verdict is unaffected in every run", markdown)
+        self.assertIn("REJECTED FOR DEPLOYMENT" if "REJECTED FOR DEPLOYMENT" in markdown
+                      else "rejected for deployment", markdown)
+
+    def test_notebook_has_a_cell_that_generates_the_table_from_the_report(self):
+        code = "".join("".join(c["source"]) for c in self.cells if c["cell_type"] == "code")
+        self.assertIn("EXECUTED RUN SUMMARY", code)
+        self.assertIn("report.json", code)
+        self.assertIn("false_allow", code)
+        self.assertIn("determinism", code)
+
+    def test_summary_cell_runs_after_training(self):
+        """Otherwise it would render the previous run's numbers, or none."""
+        sources = ["".join(c["source"]) for c in self.cells if c["cell_type"] == "code"]
+        train = next(i for i, s in enumerate(sources) if "train_risk.py" in s)
+        summary = next(i for i, s in enumerate(sources) if "EXECUTED RUN SUMMARY" in s)
+        self.assertGreater(summary, train, "summary cell must run after the training cell")
+
+    def test_markdown_carries_no_hard_coded_per_run_false_allow_total(self):
+        """A bare 'allowed N of M' is the failure mode; the spread sentence is allowed."""
+        markdown = "".join(self.cells[0]["source"])
+        import re
+        # any occurrence must sit inside the explicitly-attributed spread sentence
+        spread = "66, 58, and 33 of 176"
+        stripped = markdown.replace(spread, "").replace(
+            "of 66, 58, and 33 of 176", "")
+        self.assertNotRegex(stripped, r"allowed (?:between )?\d+ of \d+",
+                            "markdown still asserts a per-run false-allow count")
+
+
 if __name__ == "__main__":
     unittest.main()
