@@ -120,10 +120,19 @@ Then, and only then, the pre-registered run in `reports/REVIEW_PROTOCOL.md` sect
 possible. Its eight publication criteria are fixed in advance, and a run that misses them is
 published as a negative result, as the last four were.
 
-- **Runner-up variance.** The risk-ranked notebook went to Kaggle COMPLETE cleanly in v4, and was
-  deliberately **not made public**: the same code, seed, and data produced 58/176 and 13/36 against
-  the published 66/176 and 18/36, so the notebook's own execution contradicts its own write-up.
-  `FALSE_ALLOW_ANALYSIS.md` has the full variance table. Publish after the markdown states it.
+- **Run-up variance is larger than a two-run comparison suggested.** Three same-seed runs give
+  66, 58, and **33** false allows on unseen attacker goals. The kernel is **not public**: its
+  markdown asserts the earlier 58-to-66 range and v5's own output gives 33, so publishing would
+  again contradict its own execution. `FALSE_ALLOW_ANALYSIS.md` has the full table.
+- **The published temperature of 0.5 was a degenerate fit, not a real value.** v2 and v5 both
+  classify their calibration set perfectly at the selected epoch, so cross-entropy is minimised by
+  sharpening without limit and the temperature is unidentifiable. v4, the only run with a single
+  calibration error, fits to 2.179 interior. Widening the grid cannot fix an unidentified
+  parameter; a calibration set the model cannot classify perfectly can.
+- **Determinism is now fixed and proven.** v5 ran with `use_deterministic_algorithms`,
+  `cudnn.deterministic`, no `cudnn.benchmark`, no TF32, and `CUBLAS_WORKSPACE_CONFIG` set, and
+  emitted zero `does not have a deterministic implementation` warnings. v5 is the first
+  repeatable run. `src/train_risk.py` records the configuration in its report.
 - **A regression was found and fixed.** The `eval_rows` work had inserted a `continue` into the
   evaluation loop, silently dropping the 24-case diagnostic from `report["finetuned"]`. It passed
   every local test. Pinned by `tests/test_train_risk_pipeline.py`.
@@ -136,7 +145,9 @@ published as a negative result, as the last four were.
 - `src/train.py` carries eval instrumentation that is uncommitted, because the file also holds
   in-progress work that was excluded from the audit branch by request. The temperature-grid
   correction ships as `patches/temperature-grid.patch` for the same reason.
-- Making the risk-ranked Kaggle write-up public, once the variance is stated in its markdown.
+- Making the risk-ranked Kaggle write-up public. Blocked until its markdown states the three-run
+  range 33 to 66 of 176, after which the already-completed v5 run satisfies the check and no
+  further run is needed.
 - The `S1`/`S2`/`S3`/`S5` coverage warnings are permanent for an S6/S7-only stopgap.
 - `leakage.text_near` warns and does not block. Somebody must clear those warnings by hand before a
   training run.

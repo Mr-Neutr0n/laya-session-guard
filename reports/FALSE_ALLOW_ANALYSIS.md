@@ -276,49 +276,36 @@ This is stratum `S6` and its `S7` control in `reports/REVIEW_PROTOCOL.md`, and i
 consented human-reviewed cases, which do not yet exist. No further training run should be spent
 until they do.
 
-## Run-to-run variance, and why the v4 kernel was not published
+## Run-to-run variation, and why the write-up is not published yet
 
-Kaggle kernel v4 completed cleanly: no traceback, no `TypeError`, no `CalledProcessError`, and
-the final `CHALLENGE_RESULT` line that follows the fix is present. It was still not published,
-for two reasons found by inspecting its output.
+Three executions of the same code, seed, and data, differing because fp16 autocast on GPU with no
+determinism flags let training diverge:
 
-**The pipeline is not bit-reproducible.** Two runs of the same code, the same seed, and the same
-data produced different per-case decisions:
+| Split | v2 | v4 | v5 (deterministic) |
+| --- | ---: | ---: | ---: |
+| `test_user` false allows | 4/216 | 4/216 | 4/216 |
+| `test_attack` false allows | **66/176** | **58/176** | **33/176** |
+| `test_both` false allows | **18/36** | **13/36** | **11/36** |
+| `old_challenge` false allows | 7/16 | 8/16 | 7/16 |
 
-| Split | v2 (published) | v4 | Correct allows v2 → v4 |
-| --- | ---: | ---: | --- |
-| `test_user` | 4/216 | 4/216 | 208 → 213 |
-| `test_attack` | 66/176 | **58/176** | 176 → 176 |
-| `test_both` | 18/36 | **13/36** | 36 → 36 |
-| `old_challenge` | 7/16 | **8/16** | 7/8 → 6/8 |
+**The range is 33 to 66 of 176, not 58 to 66.** A two-run comparison understated the primary
+metric by a factor of two, which is the concrete argument for the 3-seed requirement in section
+10.2 being a floor rather than a formality. The verdict is unaffected: every run in the range is
+rejected by a wide margin, and the cause is the same single attacker goal in all three.
 
-Training diverged, not just evaluation: epoch-1 calibration action accuracy was 0.9985 in v2 and
-0.9769 in v4. The cause is GPU nondeterminism, which is expected: `train_risk.py` sets
-`random.seed`, `np.random.seed` and `torch.manual_seed`, but never sets
-`torch.use_deterministic_algorithms` or `cudnn.deterministic`, and trains under fp16 autocast.
-Divergence compounds over roughly 1,800 steps on a 421M model whose decisions sit near boundaries.
+v5 is the first run with determinism enabled and the first repeatable one. It recorded its
+`determinism` configuration and emitted **no** `does not have a deterministic implementation`
+warning, so every operation it used had a deterministic path. It is not comparable to v2 and v4,
+which ran a different code path; the spread across v2 to v5 is a property of the non-deterministic
+runs, not of the data.
 
-**Consequence for every number in this report.** The published 66/176 and 18/36 are point
-estimates from one run, and a same-seed rerun lands at 58/176 and 13/36. They should be read as
-roughly 58 to 66 of 176 and 13 to 18 of 36, not as exact figures. This does not change any
-verdict: even the lower end is a catastrophic false-allow rate, and the rejection stands. It does
-mean the pre-registered single-seed figures understate the true spread, which is an argument for
-the 3-seed requirement in section 10.2 being a floor rather than a formality.
+**The v5 kernel was still not made public.** Its markdown asserts 58 to 66 of 176 and 13 to 18 of
+36, the v2-to-v4 range, and v5's own output gives **33 of 176 and 11 of 36**, outside it. The
+range must be widened to cover all three runs and the notebook re-verified before any flip. The
+`old_challenge` regression is fixed and confirmed: v5's report includes `old_challenge` in
+`finetuned` again at 7 of 16, and writes `predictions-old_challenge.json`.
 
-**A regression of mine, found and fixed.** The per-case row instrumentation added in the `eval_rows`
-task inserted `if name == "old_challenge": continue` into the evaluation loop, which silently
-dropped the 24-case diagnostic from `report["finetuned"]` and stopped writing
-`predictions-old_challenge.json`. It compiled, passed all 150 local tests at the time, and only
-became visible when the v4 report came back with no `old_challenge` key. Fixed, and pinned by
-`tests/test_train_risk_pipeline.py`, which fails if a `continue` reappears in that loop. No data
-was lost, because the per-case rows were written before the `continue`.
 
-Neither finding is a reason to keep a kernel private for its own sake. The reason is narrower and
-concrete: **the v4 notebook's own markdown asserts 66/176 and 18/36, and its own execution
-produced 58/176 and 13/36.** Publishing it would put a research write-up in public view that its
-own output contradicts. The notebook should be republished once the variance is stated in the
-markdown, and once the temperature fit is re-derived from the calibration rows the same run
-produced.
 
 ## The fitted temperature, and why its Brier is worse than no calibration
 
@@ -339,20 +326,27 @@ temperature is exactly **0.5** for both fine-tuned runs, and 0.5 is the first po
 is not pinned in general, but a floor-truncated optimum and a flat calibration surface produce
 identical published output.
 
-**Whether the published 0.5 was a floor truncation can now be answered for v4, and inferred for
-v2.** v4 is the first run to persist per-case calibration logits, and they are in its output. The
-action fit on those 648 rows is **T = 2.200** on the old narrow grid and **2.179** on the wide grid,
-**interior on both**, with a loss surface that is not flat. So for v4 the grid is not the binding
-constraint and nothing was truncated.
+**The published 0.5 is now fully explained, and not by a floor truncation or a flat surface.**
+Fitting a temperature minimises cross-entropy on a calibration set, and **if the model classifies
+that set perfectly the loss is minimised by sharpening without limit.** The fit is then driven to
+the grid floor and the parameter is unidentifiable. There is no meaningful optimum below the floor
+and no flat surface; there is nothing to estimate.
 
-v2's own curve remains unmeasurable, because its calibration logits were never persisted. But v4
-is a same-config, same-seed, same-data checkpoint whose fit lands mid-grid on a non-flat surface,
-which rules out the hypothesis that this calibration surface is inherently flat. That makes floor
-truncation the **probable** cause of v2's published 0.5, not proven: the two runs' checkpoints
-differ, so v4's curve is not v2's curve.
+| Run | Calibration action accuracy at the selected epoch | Fitted T | Nature of the fit |
+| --- | ---: | ---: | --- |
+| v2 (published) | **1.000000** (308/308) | 0.5 | degenerate, at the floor |
+| v4 | 0.998457 (307/308) | 2.179 | identifiable, interior, one case wrong |
+| v5 (deterministic) | **1.000000** (308/308) | 0.5 | degenerate, at the floor |
 
-The follow-up run's content temperature, also 0.5, remains entirely unexplained by this evidence,
-since v4 did not write content calibration rows.
+v4 is the only one of the three with a single calibration error, and the only one whose
+temperature is interior. v2 and v5 classify the calibration set perfectly, both collapse to the
+floor, and on v5, where the rows now exist, the true minimum lies below T=0.0005 with loss
+0.000000. This also settles the Brier paradox: 0.3742 at T=0.5 against 0.3676 uncalibrated is what
+a degenerate sharpening fit does to an already overconfident head, not a temperature chosen to
+trade sharpness against calibration.
+
+The follow-up run's content temperature, also 0.5, remains unexplained, since no run wrote content
+calibration rows.
 
 **The Brier paradox.** On the stored `test_attack` action rows, the published T=0.5 gives Brier
 **0.3742**, while no calibration at all, T=1.0, gives **0.3676**. The fitted temperature is worse
