@@ -220,8 +220,9 @@ def main():
         path = write_rows(rows_path(OUT, name),
                           rows_from_predictions(predictions, name, model="risk-ranked"))
         print("ROWS", name, len(predictions) // len(QUESTIONS), path, flush=True)
-        if name == "old_challenge":
-            continue
+        # Every evaluated split is summarised. An earlier version of this loop skipped
+        # old_challenge here, which silently dropped the 24-case diagnostic from
+        # report["finetuned"] and stopped writing predictions-old_challenge.json.
         final[name] = {"action": action_summary(predictions),
                        "metrics": metrics(predictions, temperatures)}
         (OUT / f"predictions-{name}.json").write_text(json.dumps(predictions))

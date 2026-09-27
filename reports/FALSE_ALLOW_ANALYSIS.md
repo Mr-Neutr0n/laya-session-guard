@@ -276,6 +276,50 @@ This is stratum `S6` and its `S7` control in `reports/REVIEW_PROTOCOL.md`, and i
 consented human-reviewed cases, which do not yet exist. No further training run should be spent
 until they do.
 
+## Run-to-run variance, and why the v4 kernel was not published
+
+Kaggle kernel v4 completed cleanly: no traceback, no `TypeError`, no `CalledProcessError`, and
+the final `CHALLENGE_RESULT` line that follows the fix is present. It was still not published,
+for two reasons found by inspecting its output.
+
+**The pipeline is not bit-reproducible.** Two runs of the same code, the same seed, and the same
+data produced different per-case decisions:
+
+| Split | v2 (published) | v4 | Correct allows v2 → v4 |
+| --- | ---: | ---: | --- |
+| `test_user` | 4/216 | 4/216 | 208 → 213 |
+| `test_attack` | 66/176 | **58/176** | 176 → 176 |
+| `test_both` | 18/36 | **13/36** | 36 → 36 |
+| `old_challenge` | 7/16 | **8/16** | 7/8 → 6/8 |
+
+Training diverged, not just evaluation: epoch-1 calibration action accuracy was 0.9985 in v2 and
+0.9769 in v4. The cause is GPU nondeterminism, which is expected: `train_risk.py` sets
+`random.seed`, `np.random.seed` and `torch.manual_seed`, but never sets
+`torch.use_deterministic_algorithms` or `cudnn.deterministic`, and trains under fp16 autocast.
+Divergence compounds over roughly 1,800 steps on a 421M model whose decisions sit near boundaries.
+
+**Consequence for every number in this report.** The published 66/176 and 18/36 are point
+estimates from one run, and a same-seed rerun lands at 58/176 and 13/36. They should be read as
+roughly 58 to 66 of 176 and 13 to 18 of 36, not as exact figures. This does not change any
+verdict: even the lower end is a catastrophic false-allow rate, and the rejection stands. It does
+mean the pre-registered single-seed figures understate the true spread, which is an argument for
+the 3-seed requirement in section 10.2 being a floor rather than a formality.
+
+**A regression of mine, found and fixed.** The per-case row instrumentation added in the `eval_rows`
+task inserted `if name == "old_challenge": continue` into the evaluation loop, which silently
+dropped the 24-case diagnostic from `report["finetuned"]` and stopped writing
+`predictions-old_challenge.json`. It compiled, passed all 150 local tests at the time, and only
+became visible when the v4 report came back with no `old_challenge` key. Fixed, and pinned by
+`tests/test_train_risk_pipeline.py`, which fails if a `continue` reappears in that loop. No data
+was lost, because the per-case rows were written before the `continue`.
+
+Neither finding is a reason to keep a kernel private for its own sake. The reason is narrower and
+concrete: **the v4 notebook's own markdown asserts 66/176 and 18/36, and its own execution
+produced 58/176 and 13/36.** Publishing it would put a research write-up in public view that its
+own output contradicts. The notebook should be republished once the variance is stated in the
+markdown, and once the temperature fit is re-derived from the calibration rows the same run
+produced.
+
 ## The fitted temperature, and why its Brier is worse than no calibration
 
 A separate audit looked for the calibration bug class caught in the arXiv experiment: a temperature
@@ -295,11 +339,20 @@ temperature is exactly **0.5** for both fine-tuned runs, and 0.5 is the first po
 is not pinned in general, but a floor-truncated optimum and a flat calibration surface produce
 identical published output.
 
-**Whether the published 0.5 was a floor truncation cannot be determined from the stored
-artifacts.** The calibration logits were never persisted for any of the three runs.
-`outputs/laya-session-guard/calibration.jsonl` is the calibration *data*, not logits; the pilot's
-`predictions.json` holds per-case logits for its *test* split only. The test-split rows point the
-opposite way, to the upper edge, so they are not evidence either.
+**Whether the published 0.5 was a floor truncation can now be answered for v4, and inferred for
+v2.** v4 is the first run to persist per-case calibration logits, and they are in its output. The
+action fit on those 648 rows is **T = 2.200** on the old narrow grid and **2.179** on the wide grid,
+**interior on both**, with a loss surface that is not flat. So for v4 the grid is not the binding
+constraint and nothing was truncated.
+
+v2's own curve remains unmeasurable, because its calibration logits were never persisted. But v4
+is a same-config, same-seed, same-data checkpoint whose fit lands mid-grid on a non-flat surface,
+which rules out the hypothesis that this calibration surface is inherently flat. That makes floor
+truncation the **probable** cause of v2's published 0.5, not proven: the two runs' checkpoints
+differ, so v4's curve is not v2's curve.
+
+The follow-up run's content temperature, also 0.5, remains entirely unexplained by this evidence,
+since v4 did not write content calibration rows.
 
 **The Brier paradox.** On the stored `test_attack` action rows, the published T=0.5 gives Brier
 **0.3742**, while no calibration at all, T=1.0, gives **0.3676**. The fitted temperature is worse
@@ -331,9 +384,9 @@ report a silent truncation. The edge marker is the half of the change that actua
 On the same split the base model's optimum is interior on both grids, at 1.20 and 1.197, so this is
 not a property of every fit.
 
-The audit's own gap is the reason this cannot be closed today: the fix writes per-case calibration
-rows, so the next run can answer it. The running Kaggle v4 kernel is the first run that writes
-`calibration_predictions.jsonl`.
+The audit's own gap is why v2 could not be closed: the fix writes per-case calibration rows, and
+v4 is the first run to do so. What it showed is that a nearby checkpoint's fit is interior, which
+narrows the explanation without settling it.
 
 ## Provenance and independent replication
 

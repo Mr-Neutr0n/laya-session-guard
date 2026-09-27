@@ -120,10 +120,23 @@ Then, and only then, the pre-registered run in `reports/REVIEW_PROTOCOL.md` sect
 possible. Its eight publication criteria are fixed in advance, and a run that misses them is
 published as a negative result, as the last four were.
 
+- **Runner-up variance.** The risk-ranked notebook went to Kaggle COMPLETE cleanly in v4, and was
+  deliberately **not made public**: the same code, seed, and data produced 58/176 and 13/36 against
+  the published 66/176 and 18/36, so the notebook's own execution contradicts its own write-up.
+  `FALSE_ALLOW_ANALYSIS.md` has the full variance table. Publish after the markdown states it.
+- **A regression was found and fixed.** The `eval_rows` work had inserted a `continue` into the
+  evaluation loop, silently dropping the 24-case diagnostic from `report["finetuned"]`. It passed
+  every local test. Pinned by `tests/test_train_risk_pipeline.py`.
+- **The pipeline is not bit-reproducible.** fp16 autocast on GPU with no
+  `torch.use_deterministic_algorithms`. Published counts are point estimates from one run; the
+  3-seed requirement in the pre-registration is a floor, not a formality.
+
 ## Open items not requiring data
 
 - `src/train.py` carries eval instrumentation that is uncommitted, because the file also holds
-  in-progress work that was excluded from the audit branch by request.
+  in-progress work that was excluded from the audit branch by request. The temperature-grid
+  correction ships as `patches/temperature-grid.patch` for the same reason.
+- Making the risk-ranked Kaggle write-up public, once the variance is stated in its markdown.
 - The `S1`/`S2`/`S3`/`S5` coverage warnings are permanent for an S6/S7-only stopgap.
 - `leakage.text_near` warns and does not block. Somebody must clear those warnings by hand before a
   training run.
