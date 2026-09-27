@@ -63,8 +63,11 @@ def load_split(path, labels):
     return rows
 
 
-def build_items(tok, rows, labels, max_len=384, head_max_len=192):
-    """Tokenize one choice sequence per paper and return training-ready items."""
+def build_items(tok, rows, labels, max_len=384, head_max_len=192, require_label=True):
+    """Tokenize one choice sequence per paper and return training-ready items.
+
+    `require_label=False` is for inference, where no gold label exists yet.
+    """
     from laya.common import build_sequence
 
     question = router_question(labels)
@@ -78,8 +81,11 @@ def build_items(tok, rows, labels, max_len=384, head_max_len=192):
             raise ValueError("question options were truncated; raise head_max_len")
         if len(ids) >= max_len:
             raise ValueError(f"sequence hit the {max_len} token budget; shorten the abstract")
-        items.append({"ids": ids, "markers": markers, "id": row["id"], "label": order[row["label"]],
-                      "category": row["label"]})
+        if require_label and row["label"] not in order:
+            raise KeyError(f"row {row['id']!r} has no label in the option set")
+        items.append({"ids": ids, "markers": markers, "id": row["id"],
+                      "label": order.get(row["label"]) if require_label else None,
+                      "category": row.get("label")})
     return items
 
 

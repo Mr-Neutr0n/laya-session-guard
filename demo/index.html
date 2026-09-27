@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laya arXiv router demo</title>
+<style>
+  :root { color-scheme: light dark; --ink:#16181d; --muted:#6b7280; --line:#d8dbe0;
+           --bg:#fbfbfc; --card:#ffffff; --good:#0f7b46; --warn:#a4600a; --bad:#a32020; }
+  @media (prefers-color-scheme: dark) { :root { --ink:#e8eaed; --muted:#9aa0a6; --line:#333;
+           --bg:#14161a; --card:#1c1f24; --good:#5dd39e; --warn:#e0a458; --bad:#ff8080; } }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:2rem 1.25rem 4rem; background:var(--bg); color:var(--ink);
+          font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size:1.5rem; margin:0 0 .35rem; letter-spacing:-.01em; }
+  h2 { font-size:1.05rem; margin:0 0 .2rem; }
+  p.sub { color:var(--muted); margin:.15rem 0 1.5rem; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:.86em; }
+  .meta { border:1px solid var(--line); background:var(--card); border-radius:10px;
+           padding:.85rem 1rem; margin-bottom:1.5rem; font-size:.86rem; }
+  .meta div { display:flex; gap:.5rem; padding:.12rem 0; }
+  .meta span:first-child { color:var(--muted); min-width:9.5rem; }
+  .card { border:1px solid var(--line); background:var(--card); border-radius:10px;
+           padding:1rem 1.1rem; margin-bottom:1rem; }
+  .card.real { border-left:3px solid var(--good); }
+  .card.edge { border-left:3px solid var(--warn); }
+  .top { display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; }
+  .top .label { font-weight:650; font-size:1.05rem; }
+  .top .prob { color:var(--muted); font-size:.85rem; }
+  .badge { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em;
+            border:1px solid var(--line); border-radius:999px; padding:.1rem .5rem; color:var(--muted); }
+  .bars { margin-top:.7rem; }
+  .bar { display:grid; grid-template-columns:11rem 1fr 3.2rem; align-items:center;
+          gap:.6rem; margin:.18rem 0; font-size:.82rem; }
+  .bar .name { color:var(--muted); }
+  .bar .track { display:block; background:var(--line); border-radius:4px; height:.62rem; overflow:hidden; }
+  .bar .fill { display:block; height:100%; background:var(--muted); border-radius:4px; }
+  .bar.top1 .fill { background:var(--ink); }
+  .bar .val { text-align:right; font-variant-numeric:tabular-nums; color:var(--muted); }
+  .abstract { color:var(--muted); font-size:.85rem; margin:.6rem 0 0; }
+  .foot { color:var(--muted); font-size:.78rem; margin-top:.4rem;
+           display:flex; gap:1rem; flex-wrap:wrap; }
+  .warn { color:var(--bad); }
+  .ok { color:var(--good); }
+  footer { color:var(--muted); font-size:.8rem; margin-top:2.5rem; border-top:1px solid var(--line);
+            padding-top:1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Laya arXiv topic router, live on the published checkpoint</h1>
+  <p class="sub">Eight subject areas, title plus the first 100 abstract words, CPU only.
+     Distribution is softmax over the eight option logits, uncalibrated.</p>
+  <div class="meta"><div><span>model</span><span class='mono'>hxrikp/laya-arxiv-topic-router@1c2bb313b6a9</span></div><div><span>device</span><span class='mono'>cpu</span></div><div><span>options</span><span class='mono'>cond-mat.mes-hall, cond-mat.mtrl-sci, gr-qc, hep-ph, hep-th, math.AG, math.PR, quant-ph</span></div><div><span>abstract words kept</span><span class='mono'>100</span></div><div><span>context budget</span><span class='mono'>640 tokens, head 256</span></div></div>
+  <div id="cards"></div>
+  <footer>Real papers come from arXiv metadata submitted in 2025, far outside the 2007-2009 training window, and most of their true categories are not among the eight options. That is the point: the router has no abstain option, so a confident wrong answer is its default failure. Confidence here is uncalibrated and is not an out-of-distribution signal.</footer>
+</main>
+<script id="payload" type="application/json">{"labels": ["cond-mat.mes-hall", "cond-mat.mtrl-sci", "gr-qc", "hep-ph", "hep-th", "math.AG", "math.PR", "quant-ph"], "cases": [{"distribution": {"cond-mat.mes-hall": 0.14550796181731165, "cond-mat.mtrl-sci": 0.08971455778792195, "gr-qc": 0.022820109707640836, "hep-ph": 0.05351259499478793, "hep-th": 0.2717481074918041, "math.AG": 0.018446199100812372, "math.PR": 0.024509128876693955, "quant-ph": 0.37374134022302713}, "id": "2508.16642", "latency_ms_per_example": 855.6313749995752, "margin_over_runner_up": 0.10199323273122302, "title": "AI as IA: The use and abuse of artificial intelligence (AI) for human enhancement through intellectual augmentation (IA)", "tokens": 341, "top_label": "quant-ph", "top_probability": 0.37374134022302713, "kind": "real", "abstract": "This paper offers an overview of the prospects and ethics of using AI to achieve human enhancement, and more broadly what we call intellectual augmentation (IA). After explaining the central notions of human enhancement, IA, and AI, we discuss the state of the art in terms of the main technologies for IA, with or without brain-computer interfaces. Given this picture, we discuss potential ethical problems, namely inadequate performance, safety, coercion and manipulation, privacy, cognitive liberty, authenticity, and fairness in more detail. We conclude that while there are very significant technical hurdles to real human enhancement through AI, and significant ethical problems, there are also significant benefits that may realistically be achieved in ways that are consonant with a rights-based ethics as well. We also highlight the specific concerns that apply particularly to applications of AI for \"sheer\" IA (more realistic in the near term), and to enhancement applications, respectively.", "gold_primary_category": "cs.CY", "note": null, "first_version_date": "2025-08-18"}, {"distribution": {"cond-mat.mes-hall": 0.001768687786758701, "cond-mat.mtrl-sci": 0.003915782969153235, "gr-qc": 0.0020417803740633215, "hep-ph": 0.0027532049769113946, "hep-th": 0.007526222917346182, "math.AG": 0.40692684945175034, "math.PR": 0.5184246439366672, "quant-ph": 0.05664282758734968}, "id": "2508.16892", "latency_ms_per_example": 855.6313749995752, "margin_over_runner_up": 0.11149779448491687, "title": "A Variant Of Chaitin's Omega function", "tokens": 421, "top_label": "math.PR", "top_probability": 0.5184246439366672, "kind": "real", "abstract": "We investigate the continuous function $f$ defined by $$x\\mapsto \\sum_{\\sigma\\le_L x }2^{-K(\\sigma)}$$ as a variant of Chaitin's Omega from the perspective of analysis, computability, and algorithmic randomness. Among other results, we obtain that: (i) $f$ is differentiable precisely at density random points; (ii) $f(x)$ is $x$-random if and only if $x$ is weakly low for $K$ (low for $\\Omega$); (iii) the range of $f$ is a null, nowhere dense, perfect $\\Pi^0_1(\\emptyset')$ class with Hausdorff dimension $1$; (iv) $f(x)\\oplus x\\ge_T\\emptyset'$ for all $x$; (v) there are $2^{\\aleph_0}$ many $x$ such that $f(x)$ is not 1-random; (vi) $f$ is not Turing invariant but is Turing invariant on the ideal of $K$-trivial reals. We also discuss the connection between $f$ and other variants of Omega.", "gold_primary_category": "math.LO", "note": null, "first_version_date": "2025-08-23"}, {"distribution": {"cond-mat.mes-hall": 0.010644320738688635, "cond-mat.mtrl-sci": 0.012910853153790973, "gr-qc": 0.011916231599683283, "hep-ph": 0.01140742198634462, "hep-th": 0.02660480136682328, "math.AG": 0.02778499928986824, "math.PR": 0.725210554594847, "quant-ph": 0.17352081726995405}, "id": "2508.17142", "latency_ms_per_example": 855.6313749995752, "margin_over_runner_up": 0.5516897373248929, "title": "Frequency Response Identification of Low-Order Systems: Finite-Sample Analysis", "tokens": 342, "top_label": "math.PR", "top_probability": 0.725210554594847, "kind": "real", "abstract": "This paper proposes a frequency-domain estimator for low-order systems from repeated noisy measurements. The estimator minimizes a quadratic data-fitting term regularized by the nuclear norm of a Loewner matrix, subject to a convex stability constraint enforced via a semidefinite program. We prove a finite-sample error bound at the sampled frequencies and extend it to all frequencies through rational interpolation. The bound characterizes the dependence on the number of repeated experiments, number of frequency points, system order, and noise level. Numerical experiments on SISO and MIMO systems demonstrate the low-order-promoting effect of the method and validate the predicted scaling laws.", "gold_primary_category": "eess.SY", "note": null, "first_version_date": "2025-08-23"}, {"distribution": {"cond-mat.mes-hall": 0.02465003825256835, "cond-mat.mtrl-sci": 0.056684544683126906, "gr-qc": 0.1092559114683472, "hep-ph": 0.07965884183559406, "hep-th": 0.22124871627056167, "math.AG": 0.28539214010831077, "math.PR": 0.06353255541396263, "quant-ph": 0.15957725196752837}, "id": "2508.17392", "latency_ms_per_example": 855.6313749995752, "margin_over_runner_up": 0.0641434238377491, "title": "On $L^1$-approximation of groups", "tokens": 329, "top_label": "math.AG", "top_probability": 0.28539214010831077, "kind": "real", "abstract": "A longstanding open problem in the intersection of group theory and operator algebras is whether all groups are MF, that is, approximated by asymptotic representations with respect to the operator norm. More generally, for $1 \\leq p \\leq \\infty$, it has been asked by Thom in his ICM address whether there exist groups which are not approximated with respect to the Schatten $p$-norm. The cases of $1 < p < \\infty$ were addressed in previous works. We settle the case $p=1$, solving a question left open by Lubotzky and Oppenheim.", "gold_primary_category": "math.GR", "note": null, "first_version_date": "2025-08-24"}, {"distribution": {"cond-mat.mes-hall": 0.0008808058711814443, "cond-mat.mtrl-sci": 0.013297470329113409, "gr-qc": 0.001611891316540214, "hep-ph": 0.0042055716869958005, "hep-th": 0.021366313577110302, "math.AG": 0.9563324322805755, "math.PR": 0.000537161068168623, "quant-ph": 0.0017683538703146167}, "id": "2508.17642", "latency_ms_per_example": 748.3283644996845, "margin_over_runner_up": 0.9349661187034652, "title": "Gorenstein Normal tangent cones of integrally closed ideals in two-dimensional normal singularities", "tokens": 386, "top_label": "math.AG", "top_probability": 0.9563324322805755, "kind": "real", "abstract": "Let $(A,\\mathfrak m)$ be a two-dimensional excellent normal Gorenstein local domain containing an algebraically closed filed. Let $I =H^0(X,\\mathcal{O}_X(-Z)) \\subset A$ be an $\\mathfrak m$-primary integrally closed ideal represented by an anti-nef cycle $Z$ on some resolution $X\\to \\mathrm{Spec} A$. In this paper, we prove that $\\overline{G}(I)$ is Gorenstein if and only if it is Cohen-Macaulay and $(r-1)Z^2+K_XZ=0$, where $r=\\bar{\\athrm{r}}(I)$ denotes the normal reduction number of $I$ and $K_X$ denotes the canonical divisor on $X$.", "gold_primary_category": "math.AC", "note": null, "first_version_date": "2025-08-25"}, {"distribution": {"cond-mat.mes-hall": 0.010091376449181368, "cond-mat.mtrl-sci": 0.0645267212093362, "gr-qc": 0.0076785604862328345, "hep-ph": 0.00909536185363829, "hep-th": 0.075168564213285, "math.AG": 0.6122002244655192, "math.PR": 0.03567706915356432, "quant-ph": 0.1855621221692428}, "id": "edge-very-short", "latency_ms_per_example": 748.3283644996845, "margin_over_runner_up": 0.4266381022962764, "title": "Notes on a problem", "tokens": 208, "top_label": "math.AG", "top_probability": 0.6122002244655192, "kind": "edge", "abstract": "Very short. Results forthcoming.", "gold_primary_category": null, "note": "Three-word abstract, no subject signal at all.", "first_version_date": null}, {"distribution": {"cond-mat.mes-hall": 0.6476686445167323, "cond-mat.mtrl-sci": 0.022886699810448274, "gr-qc": 0.0031706011486255883, "hep-ph": 0.0024150469186797574, "hep-th": 0.0019869044529272585, "math.AG": 0.0032371140893883367, "math.PR": 0.31373906601655394, "quant-ph": 0.004895923046644522}, "id": "edge-ambiguous", "latency_ms_per_example": 748.3283644996845, "margin_over_runner_up": 0.3339295785001784, "title": "Stochastic estimates of a transport coefficient in a random medium", "tokens": 233, "top_label": "cond-mat.mes-hall", "top_probability": 0.6476686445167323, "kind": "edge", "abstract": "We derive a Markov chain estimator for a diffusion constant and analyse its rate of convergence. No experimental data is used.", "gold_primary_category": null, "note": "Title that fits two of the eight areas equally well.", "first_version_date": null}, {"distribution": {"cond-mat.mes-hall": 0.02146378159011651, "cond-mat.mtrl-sci": 0.013773339613922726, "gr-qc": 0.0007341921561191756, "hep-ph": 0.019893796913037293, "hep-th": 0.062394729818816545, "math.AG": 0.0007528742373044104, "math.PR": 0.0013678932567167657, "quant-ph": 0.8796193924139667}, "id": "edge-wrong-domain-1", "latency_ms_per_example": 748.3283644996845, "margin_over_runner_up": 0.8172246625951501, "title": "Ribosome profiling reveals a translation pause at a rare codon in yeast", "tokens": 244, "top_label": "quant-ph", "top_probability": 0.8796193924139667, "kind": "edge", "abstract": "Ribo-seq in Saccharomyces cerevisiae shows an uncharacterised pause site. We report the codon-level profile and validate the pause with mass spectrometry.", "gold_primary_category": null, "note": "Structural biology, nothing like any of the eight areas.", "first_version_date": null}, {"distribution": {"cond-mat.mes-hall": 0.09649323508849965, "cond-mat.mtrl-sci": 0.31895059606549064, "gr-qc": 0.09813830253112996, "hep-ph": 0.13026611916983633, "hep-th": 0.055273413350250954, "math.AG": 0.11772284276861425, "math.PR": 0.1118529046800809, "quant-ph": 0.07130258634609725}, "id": "edge-wrong-domain-2", "latency_ms_per_example": 711.8136460012465, "margin_over_runner_up": 0.18868447689565432, "title": "Aqueous phase chemistry of cloud droplets under marine aerosol conditions", "tokens": 238, "top_label": "cond-mat.mtrl-sci", "top_probability": 0.31895059606549064, "kind": "edge", "abstract": "We measure the uptake of dimethyl sulfide by sea salt aerosol in a flow tube and fit a bulk phase-transfer parameterisation for climate models.", "gold_primary_category": null, "note": "Climate chemistry, also outside the eight areas.", "first_version_date": null}, {"distribution": {"cond-mat.mes-hall": 0.0546445826311543, "cond-mat.mtrl-sci": 0.0023983831927409036, "gr-qc": 0.429062651873726, "hep-ph": 0.017961450460661037, "hep-th": 0.16984123547342395, "math.AG": 0.00044463833150742743, "math.PR": 0.0005669352113964117, "quant-ph": 0.32508012282538995}, "id": "edge-non-english", "latency_ms_per_example": 711.8136460012465, "margin_over_runner_up": 0.10398252904833605, "title": "Propagation of gravitational waves in a perturbed spacetime", "tokens": 242, "top_label": "gr-qc", "top_probability": 0.429062651873726, "kind": "edge", "abstract": "Nous etudions la propagation des ondes gravitationnelles dans un espace-temps perturbe et calculons les corrections de second ordre.", "gold_primary_category": null, "note": "French abstract with an English title.", "first_version_date": null}]}</script>
+<script>
+const data = JSON.parse(document.getElementById('payload').textContent);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = v => (v * 100).toFixed(1) + '%';
+const known = new Set(data.labels);
+
+document.getElementById('cards').innerHTML = data.cases.map(c => {
+  const ranked = Object.entries(c.distribution).sort((a, b) => b[1] - a[1]);
+  const gold = c.gold_primary_category || null;
+  const goldKnown = gold && known.has(gold);
+  const verdict = gold
+    ? (goldKnown
+        ? `<span class="${c.top_label === gold ? 'ok' : 'warn'}">gold {esc(gold)} is in the option set; top choice ${c.top_label === gold ? 'matches' : 'differs'}</span>`
+        : `<span class="warn">gold {esc(gold)} is not one of the eight options, so no answer here can be right</span>`)
+    : '<span class="mono">contrived case, no gold label</span>';
+  const bars = ranked.map(([label, value], i) => `
+    <div class="bar ${i === 0 ? 'top1' : ''}">
+      <span class="name mono">${esc(label)}</span>
+      <span class="track"><span class="fill" style="width:${(value * 100).toFixed(1)}%"></span></span>
+      <span class="val">${pct(value)}</span>
+    </div>`).join('');
+  return `<section class="card ${c.kind}">
+    <div class="top">
+      <span class="badge">${esc(c.kind)}</span>
+      <h2>${esc(c.title)}</h2>
+    </div>
+    <div class="top" style="margin-top:.35rem">
+      <span class="label mono">${esc(c.top_label)}</span>
+      <span class="prob">${pct(c.top_probability)} &middot; margin over runner-up ${pct(c.margin_over_runner_up)}</span>
+    </div>
+    <div class="bars">${bars}</div>
+    <p class="abstract">${esc(c.abstract)}</p>
+    <div class="foot">
+      <span>${verdict}</span>
+      <span>${c.tokens} tokens</span>
+      <span>${Math.round(c.latency_ms_per_example)} ms/example</span>
+      <span class="mono">${esc(c.id)}</span>
+    </div>
+  </section>`;
+}).join('');
+</script>
+</body>
+</html>

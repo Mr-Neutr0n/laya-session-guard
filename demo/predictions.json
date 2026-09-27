@@ -1,0 +1,211 @@
+{
+  "device": "cpu",
+  "head_max_len": 256,
+  "labels": [
+    "cond-mat.mes-hall",
+    "cond-mat.mtrl-sci",
+    "gr-qc",
+    "hep-ph",
+    "hep-th",
+    "math.AG",
+    "math.PR",
+    "quant-ph"
+  ],
+  "local_path": "/Users/harikp/.cache/huggingface/hub/models--hxrikp--laya-arxiv-topic-router/snapshots/1c2bb313b6a94b674c2e2c57483760eb5ccab244",
+  "max_abstract_words": 100,
+  "max_len": 640,
+  "model": "hxrikp/laya-arxiv-topic-router",
+  "predictions": [
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.14550796181731165,
+        "cond-mat.mtrl-sci": 0.08971455778792195,
+        "gr-qc": 0.022820109707640836,
+        "hep-ph": 0.05351259499478793,
+        "hep-th": 0.2717481074918041,
+        "math.AG": 0.018446199100812372,
+        "math.PR": 0.024509128876693955,
+        "quant-ph": 0.37374134022302713
+      },
+      "id": "2508.16642",
+      "latency_ms_per_example": 855.6313749995752,
+      "margin_over_runner_up": 0.10199323273122302,
+      "title": "AI as IA: The use and abuse of artificial intelligence (AI) for human enhancement through intellectual augmentation (IA)",
+      "tokens": 341,
+      "top_label": "quant-ph",
+      "top_probability": 0.37374134022302713
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.001768687786758701,
+        "cond-mat.mtrl-sci": 0.003915782969153235,
+        "gr-qc": 0.0020417803740633215,
+        "hep-ph": 0.0027532049769113946,
+        "hep-th": 0.007526222917346182,
+        "math.AG": 0.40692684945175034,
+        "math.PR": 0.5184246439366672,
+        "quant-ph": 0.05664282758734968
+      },
+      "id": "2508.16892",
+      "latency_ms_per_example": 855.6313749995752,
+      "margin_over_runner_up": 0.11149779448491687,
+      "title": "A Variant Of Chaitin's Omega function",
+      "tokens": 421,
+      "top_label": "math.PR",
+      "top_probability": 0.5184246439366672
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.010644320738688635,
+        "cond-mat.mtrl-sci": 0.012910853153790973,
+        "gr-qc": 0.011916231599683283,
+        "hep-ph": 0.01140742198634462,
+        "hep-th": 0.02660480136682328,
+        "math.AG": 0.02778499928986824,
+        "math.PR": 0.725210554594847,
+        "quant-ph": 0.17352081726995405
+      },
+      "id": "2508.17142",
+      "latency_ms_per_example": 855.6313749995752,
+      "margin_over_runner_up": 0.5516897373248929,
+      "title": "Frequency Response Identification of Low-Order Systems: Finite-Sample Analysis",
+      "tokens": 342,
+      "top_label": "math.PR",
+      "top_probability": 0.725210554594847
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.02465003825256835,
+        "cond-mat.mtrl-sci": 0.056684544683126906,
+        "gr-qc": 0.1092559114683472,
+        "hep-ph": 0.07965884183559406,
+        "hep-th": 0.22124871627056167,
+        "math.AG": 0.28539214010831077,
+        "math.PR": 0.06353255541396263,
+        "quant-ph": 0.15957725196752837
+      },
+      "id": "2508.17392",
+      "latency_ms_per_example": 855.6313749995752,
+      "margin_over_runner_up": 0.0641434238377491,
+      "title": "On $L^1$-approximation of groups",
+      "tokens": 329,
+      "top_label": "math.AG",
+      "top_probability": 0.28539214010831077
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.0008808058711814443,
+        "cond-mat.mtrl-sci": 0.013297470329113409,
+        "gr-qc": 0.001611891316540214,
+        "hep-ph": 0.0042055716869958005,
+        "hep-th": 0.021366313577110302,
+        "math.AG": 0.9563324322805755,
+        "math.PR": 0.000537161068168623,
+        "quant-ph": 0.0017683538703146167
+      },
+      "id": "2508.17642",
+      "latency_ms_per_example": 748.3283644996845,
+      "margin_over_runner_up": 0.9349661187034652,
+      "title": "Gorenstein Normal tangent cones of integrally closed ideals in two-dimensional normal singularities",
+      "tokens": 386,
+      "top_label": "math.AG",
+      "top_probability": 0.9563324322805755
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.010091376449181368,
+        "cond-mat.mtrl-sci": 0.0645267212093362,
+        "gr-qc": 0.0076785604862328345,
+        "hep-ph": 0.00909536185363829,
+        "hep-th": 0.075168564213285,
+        "math.AG": 0.6122002244655192,
+        "math.PR": 0.03567706915356432,
+        "quant-ph": 0.1855621221692428
+      },
+      "id": "edge-very-short",
+      "latency_ms_per_example": 748.3283644996845,
+      "margin_over_runner_up": 0.4266381022962764,
+      "title": "Notes on a problem",
+      "tokens": 208,
+      "top_label": "math.AG",
+      "top_probability": 0.6122002244655192
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.6476686445167323,
+        "cond-mat.mtrl-sci": 0.022886699810448274,
+        "gr-qc": 0.0031706011486255883,
+        "hep-ph": 0.0024150469186797574,
+        "hep-th": 0.0019869044529272585,
+        "math.AG": 0.0032371140893883367,
+        "math.PR": 0.31373906601655394,
+        "quant-ph": 0.004895923046644522
+      },
+      "id": "edge-ambiguous",
+      "latency_ms_per_example": 748.3283644996845,
+      "margin_over_runner_up": 0.3339295785001784,
+      "title": "Stochastic estimates of a transport coefficient in a random medium",
+      "tokens": 233,
+      "top_label": "cond-mat.mes-hall",
+      "top_probability": 0.6476686445167323
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.02146378159011651,
+        "cond-mat.mtrl-sci": 0.013773339613922726,
+        "gr-qc": 0.0007341921561191756,
+        "hep-ph": 0.019893796913037293,
+        "hep-th": 0.062394729818816545,
+        "math.AG": 0.0007528742373044104,
+        "math.PR": 0.0013678932567167657,
+        "quant-ph": 0.8796193924139667
+      },
+      "id": "edge-wrong-domain-1",
+      "latency_ms_per_example": 748.3283644996845,
+      "margin_over_runner_up": 0.8172246625951501,
+      "title": "Ribosome profiling reveals a translation pause at a rare codon in yeast",
+      "tokens": 244,
+      "top_label": "quant-ph",
+      "top_probability": 0.8796193924139667
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.09649323508849965,
+        "cond-mat.mtrl-sci": 0.31895059606549064,
+        "gr-qc": 0.09813830253112996,
+        "hep-ph": 0.13026611916983633,
+        "hep-th": 0.055273413350250954,
+        "math.AG": 0.11772284276861425,
+        "math.PR": 0.1118529046800809,
+        "quant-ph": 0.07130258634609725
+      },
+      "id": "edge-wrong-domain-2",
+      "latency_ms_per_example": 711.8136460012465,
+      "margin_over_runner_up": 0.18868447689565432,
+      "title": "Aqueous phase chemistry of cloud droplets under marine aerosol conditions",
+      "tokens": 238,
+      "top_label": "cond-mat.mtrl-sci",
+      "top_probability": 0.31895059606549064
+    },
+    {
+      "distribution": {
+        "cond-mat.mes-hall": 0.0546445826311543,
+        "cond-mat.mtrl-sci": 0.0023983831927409036,
+        "gr-qc": 0.429062651873726,
+        "hep-ph": 0.017961450460661037,
+        "hep-th": 0.16984123547342395,
+        "math.AG": 0.00044463833150742743,
+        "math.PR": 0.0005669352113964117,
+        "quant-ph": 0.32508012282538995
+      },
+      "id": "edge-non-english",
+      "latency_ms_per_example": 711.8136460012465,
+      "margin_over_runner_up": 0.10398252904833605,
+      "title": "Propagation of gravitational waves in a perturbed spacetime",
+      "tokens": 242,
+      "top_label": "gr-qc",
+      "top_probability": 0.429062651873726
+    }
+  ],
+  "revision": "1c2bb313b6a94b674c2e2c57483760eb5ccab244"
+}

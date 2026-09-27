@@ -91,6 +91,12 @@ Published artefacts:
 
 - [Hugging Face checkpoint and model card](https://huggingface.co/hxrikp/laya-arxiv-topic-router)
 - [Kaggle results notebook](https://www.kaggle.com/code/uranium53/laya-arxiv-router-base-vs-fine-tuned)
+- [Runnable paper-triage demo](demo/README.md), with a static view at `demo/index.html`
+
+The demo loads the published checkpoint at its pinned revision, routes a title and
+abstract you supply, and renders a batch of predictions as a single self-contained
+HTML file. Its own documentation records what it gets wrong, including a confidently
+wrong biology paper at 0.88.
 
 ## Reproduce
 
