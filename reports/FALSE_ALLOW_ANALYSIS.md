@@ -332,21 +332,45 @@ that set perfectly the loss is minimised by sharpening without limit.** The fit 
 the grid floor and the parameter is unidentifiable. There is no meaningful optimum below the floor
 and no flat surface; there is nothing to estimate.
 
-| Run | Calibration action accuracy at the selected epoch | Fitted T | Nature of the fit |
-| --- | ---: | ---: | --- |
-| v2 (published) | **1.000000** (308/308) | 0.5 | degenerate, at the floor |
-| v4 | 0.998457 (307/308) | 2.179 | identifiable, interior, one case wrong |
-| v5 (deterministic) | **1.000000** (308/308) | 0.5 | degenerate, at the floor |
+| Run | Calibration action accuracy per epoch | Epoch selected | Fitted T | Nature of the fit |
+| --- | --- | ---: | ---: | --- |
+| v2 (published) | ep1 0.998457 (307/308), **ep2 1.000000 (308/308)**, ep3 1.000000 | 2 | 0.5 | **unidentifiable**, at the floor |
+| v4 | ep1 0.976852 (293/308), **ep2 0.998457 (307/308)**, ep3 0.998457 | 2 | 2.200 | identifiable, interior |
+| v5 (deterministic) | **ep1 1.000000 (308/308)**, ep2 1.000000, ep3 1.000000 | 1 | 0.5 | **unidentifiable**, at the floor |
 
-v4 is the only one of the three with a single calibration error, and the only one whose
-temperature is interior. v2 and v5 classify the calibration set perfectly, both collapse to the
-floor, and on v5, where the rows now exist, the true minimum lies below T=0.0005 with loss
-0.000000. This also settles the Brier paradox: 0.3742 at T=0.5 against 0.3676 uncalibrated is what
-a degenerate sharpening fit does to an already overconfident head, not a temperature chosen to
-trade sharpness against calibration.
+Fitting a temperature minimises cross-entropy on a calibration set, and **if the model classifies
+that set perfectly the loss is minimised by sharpening without limit.** The parameter is then
+driven to whatever the grid floor happens to be and means nothing. Refitting on the rows v4 and
+v5 persisted, over a grid reaching T=0.0005:
 
-The follow-up run's content temperature, also 0.5, remains unexplained, since no run wrote content
-calibration rows.
+- **v4**, the only run of the three with a calibration error, gives a true argmin of **2.195**,
+  interior, loss 0.011701 against 0.018615 at T=1.0. A real, identifiable temperature.
+- **v5**, perfectly classified, gives a true argmin **below 0.0005**, at the edge, with loss
+  0.000000 against 0.002896 at T=1.0. The objective is being minimised by removing the
+  probability mass from every wrong class, not by calibrating anything.
+
+So v2's published 0.5 and v5's 0.5 are the same artefact: an epoch was selected on a perfectly
+classified calibration set, and the fit recorded the grid floor as though it were a measurement.
+There is no floor truncation to correct and no flat surface; there is an unidentifiable parameter.
+v4 is the only run that produced a real one, and it is not the run that was published.
+
+**What this means for the published table.** The action-head temperature of 0.5 in the published
+`report.json` should not be read as a fitted value, and the action Brier and ECE computed at it
+are not valid calibration measurements. The decision metrics are untouched, because argmax is
+invariant to temperature: 66 of 176 and 18 of 36 remain what the run did, and the rejection is
+unaffected. The content temperature of 1.875 is unassessed, because no run wrote content
+calibration rows. The follow-up run's content temperature of 0.5 is unassessed for the same
+reason.
+
+**The correction is not a wider grid.** `patches/temperature-grid.patch` records the edge, which
+turns a silent degenerate fit into a reported one, and that matters: v5's true optimum lies below
+the patch's 0.05 floor, so without the marker the run would still have published 0.05 as a fitted
+value. But no grid repairs an unidentified parameter. The fix is to select the epoch on a
+calibration set the model cannot classify perfectly, to fit on a held-out split with errors, or to
+report the temperature as unidentifiable and publish Brier and ECE at T=1.0 with a note that the
+model is overconfident. That is a change to the epoch-selection rule in
+`src/train_risk.py`, which is on this branch and unapplied, and it is a decision about what the
+calibration set is for rather than a bug fix.
 
 **The Brier paradox.** On the stored `test_attack` action rows, the published T=0.5 gives Brier
 **0.3742**, while no calibration at all, T=1.0, gives **0.3676**. The fitted temperature is worse
