@@ -145,9 +145,16 @@ published as a negative result, as the last four were.
 - `src/train.py` carries eval instrumentation that is uncommitted, because the file also holds
   in-progress work that was excluded from the audit branch by request. The temperature-grid
   correction ships as `patches/temperature-grid.patch` for the same reason.
-- Making the risk-ranked Kaggle write-up public. Blocked until its markdown states the three-run
-  range 33 to 66 of 176, after which the already-completed v5 run satisfies the check and no
-  further run is needed.
+- **The risk-ranked Kaggle write-up is public as of kernel v8**, at
+  `kaggle.com/code/uranium53/laya-risk-ranked-aspi`. Its markdown asserts no per-run number; the
+  table is generated from the run's own report, so a run can no longer contradict its write-up.
+  v7 completed cleanly and was verified against its own output before the flip: 36 of 176 on
+  unseen attacker goals, 7 of 36 on the both-unseen split, 2 of 216 on unseen user tasks, 6 of 16
+  on the 24-case diagnostic. Rejected, as every recorded run is.
+- The v7 run selected epoch 3, whose calibration accuracy was 99.8% with **exactly one error**,
+  and its temperature fit is interior at 2.45 rather than pinned to the grid floor. That is a
+  direct confirmation of the identifiability finding from an independent run: one calibration
+  error makes the temperature estimable, zero collapses it.
 - The `S1`/`S2`/`S3`/`S5` coverage warnings are permanent for an S6/S7-only stopgap.
 - `leakage.text_near` warns and does not block. Somebody must clear those warnings by hand before a
   training run.

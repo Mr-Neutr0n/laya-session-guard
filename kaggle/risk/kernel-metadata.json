@@ -4,7 +4,7 @@
   "code_file": "risk.ipynb",
   "language": "python",
   "kernel_type": "notebook",
-  "is_private": true,
+  "is_private": false,
   "enable_gpu": true,
   "enable_internet": true,
   "machine_shape": "NvidiaL4",
