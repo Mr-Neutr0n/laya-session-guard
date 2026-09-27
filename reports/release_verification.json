@@ -1,0 +1,49 @@
+{
+  "applied_temperature": {
+    "choice:6-10": 0.97,
+    "temperature_choice": 0.97
+  },
+  "bare_label_prompt_accuracy": 0.175,
+  "chance": 0.125,
+  "config": {
+    "config_temperature_by_options": {
+      "choice:6-10": 0.97
+    },
+    "config_temperature_choice_fallback": 0.97,
+    "prompt_artifact_published": true,
+    "revision": "a4cad5ab032df32adfc41e8e9572f65c6f2ab9dd",
+    "temperature_that_laya_will_apply": 0.97,
+    "training_schedule_completed": false,
+    "training_steps_completed": 838,
+    "training_wall_clock_budget_seconds": 7200.0,
+    "upstream_base_record_keys_present": []
+  },
+  "held_out_rows": 120,
+  "model": "hxrikp/laya-arxiv-topic-router",
+  "rows_per_class": 15,
+  "temperature_evidence": {
+    "agent_probabilities": {
+      "cond-mat.mes-hall": 0.4902,
+      "cond-mat.mtrl-sci": 0.3988,
+      "gr-qc": 0.0,
+      "hep-ph": 0.0102,
+      "hep-th": 0.0014,
+      "math.AG": 0.0,
+      "math.PR": 0.0001,
+      "quant-ph": 0.0992
+    },
+    "applied_temperature": {
+      "expected_top": "cond-mat.mes-hall",
+      "max_abs_difference": 4.870775037298286e-05
+    },
+    "config_temperature": 0.97,
+    "recovered_temperature": 0.97,
+    "residual_at_recovered_temperature": 8.136385730430654e-05,
+    "residual_at_unit_temperature": 0.006109048189892314,
+    "unit_temperature": {
+      "expected_top": "cond-mat.mes-hall",
+      "max_abs_difference": 0.004346914967611248
+    }
+  },
+  "trained_prompt_accuracy": 0.6
+}

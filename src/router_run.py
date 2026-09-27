@@ -22,6 +22,12 @@ import time
 from pathlib import Path
 
 MODEL_REVISION = "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
+# Mirror of laya.common.TEMP_MIN / TEMP_MAX. Laya clamps a shipped temperature into
+# this range and warns when it clamps, so a value outside it would be applied
+# differently from the one reported. Duplicated rather than imported because
+# `verify` runs the unit tests with the system interpreter, which has no laya.
+TEMP_MIN = 0.5
+TEMP_MAX = 5.0
 MAX_LEN = 640
 HEAD_MAX_LEN = 256
 SEED = 42
@@ -182,6 +188,14 @@ def paired(base_report, tuned_report, labels):
     return result
 
 
+def fit_temperature_for_release(calibration_rows):
+    """The temperature a released checkpoint should carry in its config."""
+    from router_metrics import fit_temperature
+    temperature, _ = fit_temperature([row["logits"] for row in calibration_rows],
+                                     [row["label"] for row in calibration_rows])
+    return temperature
+
+
 def trainable_parameters(model, train_encoder_layers):
     import torch
     from contextlib import contextmanager
@@ -219,7 +233,7 @@ def no_grad_encoder(model):
     return original
 
 
-def train(args, model, config, rows, labels, device, pad, output_dir):
+def train(args, model, config, rows, labels, device, pad, output_dir, calibration_rows=None):
     import torch
     from router_metrics import Latency
     random.seed(SEED)
@@ -282,7 +296,17 @@ def train(args, model, config, rows, labels, device, pad, output_dir):
     if stopped_early:
         history.append({"note": stopped_early})
         print("STOPPED EARLY:", stopped_early, flush=True)
-    save_checkpoint(model, config, args, output_dir)
+    save_checkpoint(model, config, args, output_dir, training={
+        "seed": SEED, "device": str(device), "epochs_requested": args.epochs,
+        "epochs_completed": len([h for h in history if "steps" in h]),
+        "steps_per_epoch": steps_per_epoch, "steps": sum(h["steps"] for h in history if "steps" in h),
+        "steps_epoch_2": next((h["steps"] for h in history if h.get("epoch") == 2), None),
+        "batch_size": args.batch_size, "trainable_parameters": trainable,
+        "groups": [g["name"] for g in groups], "encoder_layers_trained": args.encoder_layers,
+        "max_train_seconds": args.max_train_seconds, "training_seconds": training_seconds,
+        "schedule_completed": stopped_early is None, "stopped_early": stopped_early,
+        "history": history},
+        temperature=fit_temperature_for_release(calibration_rows) if calibration_rows else 1.0)
     return {"history": history, "training_seconds": training_seconds, "steps": sum(h["steps"] for h in history if "steps" in h),
             "steps_per_epoch": steps_per_epoch,
             "steps_epoch_2": next((h["steps"] for h in history if h.get("epoch") == 2), None),
@@ -294,7 +318,82 @@ def train(args, model, config, rows, labels, device, pad, output_dir):
             "encoder_layers_trained": args.encoder_layers, "device": str(device)}
 
 
-def save_checkpoint(model, config, args, output_dir):
+def training_summary(training):
+    """Fill the schedule facts from the per-epoch history.
+
+    A report written before these fields existed still states the schedule
+    through its history, and a released config with nulls for the step counts
+    is worse than one derived from the record.
+    """
+    summary = dict(training)
+    history = [h for h in summary.get("history", []) if "steps" in h]
+    if history:
+        summary.setdefault("steps_per_epoch",
+                           max(h["steps"] for h in history[:-1]) if len(history) > 1 else history[0]["steps"])
+        summary.setdefault("steps_epoch_2", history[-1]["steps"])
+    summary.setdefault("schedule_completed", bool(history) and summary.get("stopped_early") is None)
+    if summary.get("max_train_seconds") is None and summary.get("stopped_early"):
+        # The stop reason is the only record of the budget in older reports.
+        import re
+        found = re.search(r"time budget ([0-9.]+)s", summary["stopped_early"])
+        summary["max_train_seconds"] = float(found.group(1)) if found else None
+    return summary
+
+
+def release_config(config, training=None, temperature=1.0, extra=None):
+    """The rl_agent_config.json that ships with a released checkpoint.
+
+    Three things have to be right here and each was wrong at least once:
+
+    * `temperature` must carry the value fitted on the calibration split, or a
+      caller who does `laya.load(...)` gets T=1.0 while the reported Brier and ECE
+      assume the fitted value. Laya clamps to [0.5, 5.0], so an out-of-range fit
+      would be silently distorted; refuse to write one.
+    * `training` must be this run's record. The upstream base checkpoint's own
+      training block is easy to inherit by accident and it contradicts the
+      published numbers.
+    * `temperature_by_options` uses Laya's bucket name for an eight-option choice
+      question, `choice:6-10`, so a caller asking a different number of options
+      does not silently inherit this fit.
+    """
+    if not TEMP_MIN <= temperature <= TEMP_MAX:
+        raise ValueError(f"temperature {temperature} is outside Laya's usable range "
+                         f"[{TEMP_MIN}, {TEMP_MAX}]; it would be clamped on load")
+    published = dict(config)
+    published.pop("training", None)
+    published["fine_tuned"] = True
+    published["model_name"] = "laya-arxiv-topic-router"
+    published["temperature"] = [float(temperature), 1.0, 1.0]
+    published["temperature_by_options"] = {"choice:6-10": float(temperature)}
+    if training:
+        training = training_summary(training)
+        published["training"] = {
+            "task": "arXiv subject-area routing from title and truncated abstract",
+            "base_model": "convaiinnovations/laya",
+            "base_revision": MODEL_REVISION,
+            "seed": training.get("seed", SEED),
+            "device": training.get("device"),
+            "epochs_requested": training.get("epochs_requested"),
+            "epochs_started": training.get("epochs_completed"),
+            "steps_per_epoch": training.get("steps_per_epoch"),
+            "steps_completed": training.get("steps"),
+            "steps_in_final_partial_epoch": training.get("steps_epoch_2"),
+            "batch_size": training.get("batch_size"),
+            "trainable_parameters": training.get("trainable_parameters"),
+            "trained_groups": training.get("groups"),
+            "encoder_layers_trained": training.get("encoder_layers_trained"),
+            "wall_clock_budget_seconds": training.get("max_train_seconds"),
+            "training_seconds": training.get("training_seconds"),
+            "schedule_completed": training.get("schedule_completed", False),
+            "stopped_early": training.get("stopped_early"),
+            "mean_loss_per_epoch": [h["mean_loss"] for h in training.get("history", []) if "mean_loss" in h],
+        }
+    if extra:
+        published.update(extra)
+    return published
+
+
+def save_checkpoint(model, config, args, output_dir, training=None, temperature=1.0, extra=None):
     from safetensors.torch import save_file
     from transformers import AutoTokenizer
     target = Path(output_dir)
@@ -303,11 +402,9 @@ def save_checkpoint(model, config, args, output_dir):
     save_file(state, str(target / "model.safetensors"))
     args.tokenizer.save_pretrained(target / "tokenizer")
     model.encoder.config.save_pretrained(target / "encoder")
-    config = dict(config)
-    config["fine_tuned"] = True
-    config["model_name"] = "laya-arxiv-topic-router"
+    config = release_config(config, training, temperature, extra)
     (target / "rl_agent_config.json").write_text(json.dumps(config, indent=2, sort_keys=True) + "\n")
-    print("SAVED", target, flush=True)
+    print("SAVED", target, "temperature", temperature, flush=True)
 
 
 def extras(args, rows, labels, base_dir, base_model, device, pad, report, output):
@@ -481,7 +578,8 @@ def main():
         output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
         return
 
-    report["training"] = train(args, model, config, rows, labels, device, pad, args.output_dir)
+    report["training"] = train(args, model, config, rows, labels, device, pad, args.output_dir,
+                               calibration_rows=base_cal)
     model, config = load_model(args.output_dir, device)
     tuned_rows, tuned_latency = evaluate(model, prepared["test"], device, pad, tag="tuned-test")
     tuned_cal, _ = evaluate(model, prepared["calibration"], device, pad, tag="tuned-cal")

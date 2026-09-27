@@ -1,0 +1,38 @@
+{
+  "base_model": "convaiinnovations/laya",
+  "base_revision": "1c5edc17a7acd8701df6fc341c0d179f1c62c982",
+  "budget": {
+    "abstract_words": 100,
+    "head_max_len": 256,
+    "max_len": 640
+  },
+  "input": "A state with exactly two fields, title and abstract. The abstract is truncated to its first 100 words. No category, licence, author, date or identifier may be present.",
+  "labels": [
+    "cond-mat.mes-hall",
+    "cond-mat.mtrl-sci",
+    "gr-qc",
+    "hep-ph",
+    "hep-th",
+    "math.AG",
+    "math.PR",
+    "quant-ph"
+  ],
+  "name": "laya-arxiv-topic-router",
+  "question": {
+    "criteria": {
+      "cond-mat.mes-hall": "Condensed matter: mesoscopic transport, Hall and magnetotransport, quantum dots.",
+      "cond-mat.mtrl-sci": "Condensed matter materials: surfaces, thin films, nanostructures, growth.",
+      "gr-qc": "General relativity and quantum cosmology: gravity, black holes, spacetime.",
+      "hep-ph": "High energy phenomenology: colliders, the Standard Model, neutrino experiments.",
+      "hep-th": "High energy theory: field theory, strings, supersymmetry, quantum gravity.",
+      "math.AG": "Mathematics: algebraic and differential geometry, topology, algebra.",
+      "math.PR": "Mathematics: probability, stochastic processes, statistics.",
+      "quant-ph": "Quantum physics: quantum information, computing, optics, open systems."
+    },
+    "instructions": "Route the preprint to its primary arXiv subject area. Judge the title and abstract only, and choose exactly one area.",
+    "type": "choice"
+  },
+  "task": "Eight-way arXiv subject-area routing from title and truncated abstract.",
+  "usage_note": "The criteria descriptions are load-bearing. A caller that replaces them with bare category codes, as an earlier version of the model card did, gets materially worse answers from the same weights."
+}
+

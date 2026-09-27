@@ -265,3 +265,88 @@ class MetricsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReleaseConfigTests(unittest.TestCase):
+    """The released config once shipped the base checkpoint's training record."""
+
+    def _training(self, **overrides):
+        record = {"seed": 42, "device": "cpu", "epochs_requested": 2, "epochs_completed": 2,
+                  "steps_per_epoch": 500, "steps": 838, "steps_epoch_2": 338, "batch_size": 8,
+                  "trainable_parameters": 50762753, "groups": ["head", "encoder_top"],
+                  "encoder_layers_trained": 2, "max_train_seconds": 7200.0,
+                  "training_seconds": 7209.03, "stopped_early": "time budget 7200.0s reached in epoch 2",
+                  "history": [{"epoch": 1, "steps": 500, "mean_loss": 1.2165},
+                              {"epoch": 2, "steps": 338, "mean_loss": 0.9575}]}
+        record.update(overrides)
+        return record
+
+    def test_upstream_base_training_record_is_never_inherited(self):
+        from router_run import release_config
+        upstream = {"training": {"epochs_completed": 1, "hours": 1.96, "updates": 7313,
+                                 "world_size": 1, "fine_tuned_from_checkpoint": True},
+                    "temperature": [1.6369, 1.2514, 1.9834],
+                    "temperature_by_options": {"choice:3-5": 1.7601, "choice:11+": 0.1005}}
+        published = release_config(upstream, self._training(), 0.97)
+        leaked = {"epochs_completed", "hours", "updates", "world_size",
+                  "fine_tuned_from_checkpoint"} & set(published["training"])
+        self.assertEqual(leaked, set())
+        self.assertEqual(published["training"]["steps_completed"], 838)
+        self.assertEqual(published["training"]["steps_in_final_partial_epoch"], 338)
+        self.assertEqual(published["training"]["wall_clock_budget_seconds"], 7200.0)
+        self.assertFalse(published["training"]["schedule_completed"])
+        # The upstream per-bucket table must not survive either.
+        self.assertEqual(set(published["temperature_by_options"]), {"choice:6-10"})
+
+    def test_fitted_temperature_is_written_for_the_eight_option_bucket(self):
+        from router_run import release_config
+        published = release_config({"temperature": [1.0, 1.0, 1.0]}, self._training(), 0.97)
+        self.assertEqual(published["temperature"][0], 0.97)
+        self.assertEqual(published["temperature_by_options"]["choice:6-10"], 0.97)
+        # choice is qtype 0, so the fallback must be the choice value.
+        self.assertEqual(published["temperature"][1:], [1.0, 1.0])
+
+    def test_a_temperature_laya_would_clamp_is_refused(self):
+        from router_run import release_config
+        for bad in (0.1, 9.0):
+            with self.assertRaises(ValueError):
+                release_config({}, self._training(), bad)
+
+    def test_schedule_facts_are_derived_from_history_when_absent(self):
+        from router_run import training_summary
+        record = {"history": [{"epoch": 1, "steps": 500, "mean_loss": 1.2},
+                              {"epoch": 2, "steps": 338, "mean_loss": 0.9}],
+                  "stopped_early": "time budget 7200.0s reached in epoch 2"}
+        summary = training_summary(record)
+        self.assertEqual(summary["steps_per_epoch"], 500)
+        self.assertEqual(summary["steps_epoch_2"], 338)
+        self.assertEqual(summary["max_train_seconds"], 7200.0)
+        self.assertFalse(summary["schedule_completed"])
+
+
+class PromptArtifactTests(unittest.TestCase):
+    """The card snippet must reproduce the prompt the model was trained on."""
+
+    def test_prompt_file_matches_the_training_prompt(self):
+        from arxiv_router_data import LABELS
+        from router_task import INSTRUCTIONS, router_question
+        artifact = json.loads((Path(__file__).resolve().parents[1] / "router_prompt.json").read_text())
+        question = router_question(LABELS)
+        self.assertEqual(artifact["labels"], list(LABELS))
+        self.assertEqual(artifact["question"]["instructions"], INSTRUCTIONS)
+        self.assertEqual(artifact["question"]["criteria"], question["crit"])
+        self.assertEqual(artifact["budget"], {"max_len": 640, "head_max_len": 256, "abstract_words": 100})
+
+    def test_criteria_are_descriptions_not_bare_labels(self):
+        artifact = json.loads((Path(__file__).resolve().parents[1] / "router_prompt.json").read_text())
+        for label, text in artifact["question"]["criteria"].items():
+            self.assertNotEqual(text, label)
+            self.assertGreater(len(text), 20)
+
+    def test_clamp_bounds_mirror_laya_when_it_is_importable(self):
+        import importlib.util
+        if importlib.util.find_spec("laya") is None:
+            self.skipTest("laya is not installed in the interpreter running verify")
+        from laya import common
+        from router_run import TEMP_MAX, TEMP_MIN
+        self.assertEqual((TEMP_MIN, TEMP_MAX), (common.TEMP_MIN, common.TEMP_MAX))

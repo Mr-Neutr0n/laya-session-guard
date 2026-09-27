@@ -93,6 +93,13 @@ Published artefacts:
 - [Kaggle results notebook](https://www.kaggle.com/code/uranium53/laya-arxiv-router-base-vs-fine-tuned)
 - [Runnable paper-triage demo](demo/README.md), with a static view at `demo/index.html`
 
+`router_prompt.json` in this repository is the exact prompt the checkpoint was trained
+on, and it is published in the Hub repository as well. The criteria descriptions are
+load-bearing: the same weights score 0.600 on 120 held-out rows with the trained prompt
+and 0.175 with bare category codes, against a 0.125 floor. `scripts/verify_release.py`
+loads the published revision through `laya`, checks the fitted temperature is applied,
+and scores both prompts.
+
 The demo loads the published checkpoint at its pinned revision, routes a title and
 abstract you supply, and renders a batch of predictions as a single self-contained
 HTML file. Its own documentation records what it gets wrong, including a confidently

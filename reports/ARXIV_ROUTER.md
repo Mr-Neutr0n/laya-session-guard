@@ -195,6 +195,16 @@ under their own per-author licences, and 69% of the kept rows record no licence 
 all. Titles and abstracts are used here as model input, not redistributed: the
 built splits are git-ignored and rebuilt by the script.
 
+## Release verification
+
+An independent review of the published card and checkpoint found four defects, all
+fixed in revision `a4cad5ab032df32adfc41e8e9572f65c6f2ab9dd`: a miscounted column in
+the base model's bias, the upstream base checkpoint's training record inherited into
+the released config, a missing temperature so `laya.load` applied T=1.0, and a usage
+snippet whose criteria were not the prompt the model was trained on. The corrected
+numbers are verified by loading the published revision through `laya` and scoring both
+prompts on 120 held-out rows; see `reports/release_verification.json`.
+
 ## Limitations
 
 - Labels are arXiv author-declared primary categories, not expert annotations.
