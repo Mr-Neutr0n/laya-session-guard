@@ -77,6 +77,18 @@ EMAIL_PATTERN = re.compile(r"\b[\w.+-]+@([\w-]+\.[\w.]+)\b")
 EMAIL_ALLOWLIST = {"example.com", "example.org", "example.net", "invalid", "test"}
 
 
+def label_of(case):
+    """The human action for a case, or None if it has not been reviewed.
+
+    A pending candidate carries no label, so every label-dependent check must go
+    through here rather than indexing into case["labels"], which is null.
+    """
+    labels = case.get("labels")
+    if not isinstance(labels, dict):
+        return None
+    return labels.get("action")
+
+
 def normalize_key(value):
     """Compare identity strings by content, ignoring case, padding, and separators."""
     if not isinstance(value, str):
@@ -197,13 +209,42 @@ def check_consent(case, report):
     # agree with origin, so a synthetic case generated to cover a known failure cannot be
     # recorded in a way that reads as an observation, and a real capture cannot be laundered
     # as template content.
+    pending_origin = provenance.get("origin") == "pending_consent"
     data_origin = provenance.get("data_origin")
     if data_origin is not None:
-        expected = "consented" if consented_origin else "synthetic"
+        expected = ("consented" if consented_origin else
+                    "pending_consent" if pending_origin else "synthetic")
         if data_origin != expected:
             report.error(case_id, "consent.data_origin",
                          f"provenance.data_origin is {data_origin!r} but origin "
                          f"{provenance.get('origin')!r} implies {expected!r}")
+    if pending_origin:
+        # A machine-collected candidate must be visibly unapproved and unlabelled.
+        if not provenance.get("approval_state"):
+            report.error(case_id, "consent.approval_state",
+                         "origin is pending_consent but approval_state is absent; a candidate "
+                         "must state that it awaits the subject's approval")
+        elif provenance["approval_state"] not in ("pending_consent", "approved", "withdrawn"):
+            report.error(case_id, "consent.approval_state",
+                         f"approval_state {provenance['approval_state']!r} is not recognised")
+        if provenance.get("consent_id"):
+            report.error(case_id, "consent.missing",
+                         "origin is pending_consent but a consent_id is recorded; consent "
+                         "cannot be asserted before the subject has agreed")
+        if provenance.get("redaction") != "applied":
+            report.error(case_id, "consent.redaction",
+                         "a pending candidate must record redaction as applied, since redaction "
+                         "runs before anything is written")
+        if case.get("annotations"):
+            report.error(case_id, "candidate.prelabelled",
+                         "a pending candidate carries annotations; a machine-collected case must "
+                         "not arrive pre-labelled by anyone")
+        if case.get("labels"):
+            report.error(case_id, "candidate.prelabelled",
+                         "a pending candidate carries a label; it has not been reviewed")
+        if case.get("adjudication"):
+            report.error(case_id, "candidate.prelabelled",
+                         "a pending candidate carries an adjudication record")
     if consented_origin:
         if not normalize_key(consent_id):
             report.error(case_id, "consent.missing",
@@ -251,7 +292,7 @@ def check_permission(case, report):
     if granted and not scope:
         report.error(case_id, "permission.scope",
                      "permission.granted is true with an empty scope, which authorizes nothing")
-    if permission.get("revoked") and case.get("labels", {}).get("action") == "allow":
+    if permission.get("revoked") and label_of(case) == "allow":
         report.error(case_id, "permission.revoked",
                      "permission.revoked is true but the label is allow; a withdrawn grant "
                      "cannot support an allow")
@@ -273,10 +314,20 @@ def check_permission(case, report):
 
 
 def check_annotations(case, report):
-    """Two distinct humans, and a decision consistent with what they said."""
+    """Two distinct humans, and a decision consistent with what they said.
+
+    Skipped for a pending candidate, which by definition has not been reviewed. The
+    candidate-specific rules live in check_consent.
+    """
     case_id = case.get("case_id", "?")
+    if case.get("provenance", {}).get("origin") == "pending_consent":
+        return
     annotations = case.get("annotations", [])
-    adjudication = case.get("adjudication", {})
+    adjudication = case.get("adjudication", {}) or {}
+    if not annotations:
+        report.error(case_id, "annotation.missing",
+                     "a reviewed case needs at least two independent human annotations")
+        return
     reviewers = [normalize_key(a.get("reviewer_id")) for a in annotations]
     for annotation in annotations:
         if not normalize_key(annotation.get("reviewer_id")):
@@ -421,11 +472,12 @@ def check_leakage(cases, report):
 
 def one_bit_rate(rows):
     """Accuracy of predicting the action from history_complete alone, in percent."""
+    rows = [c for c in rows if label_of(c) is not None]
     if not rows:
         return 0.0
     by_flag = defaultdict(Counter)
     for case in rows:
-        by_flag[case["state"]["context"]["history_complete"]][case["labels"]["action"]] += 1
+        by_flag[case["state"]["context"]["history_complete"]][label_of(case)] += 1
     correct = sum(counts.most_common(1)[0][1] for counts in by_flag.values())
     return 100.0 * correct / len(rows)
 
@@ -438,7 +490,12 @@ def check_shortcut(cases, report, threshold, min_stratum_cases):
     Checked globally and per stratum, because a flag that predicts the label perfectly
     inside one stratum still teaches the shortcut and still hides in the global average.
     """
-    fitting = [c for c in cases if c["split"] in ("dev", "calib")]
+    fitting = [c for c in cases if c["split"] in ("dev", "calib") and label_of(c) is not None]
+    if not fitting:
+        report.warn(None, "shortcut.no_labelled_cases",
+                    "no labelled cases in dev or calib; the shortcut and calibration checks "
+                    "cannot be evaluated on unlabelled candidates")
+        return
     if not fitting:
         report.warn(None, "shortcut.no_fitting_data",
                     "no dev or calib cases; the history_complete shortcut cannot be checked")
@@ -486,7 +543,8 @@ def check_shortcut(cases, report, threshold, min_stratum_cases):
                     f"full dev and calib splits")
     by_stratum = defaultdict(list)
     for case in fitting:
-        by_stratum[case["stratum"]].append(case)
+        if label_of(case) is not None:
+            by_stratum[case["stratum"]].append(case)
     for stratum in sorted(by_stratum):
         rows = by_stratum[stratum]
         # Two guards, both needed. A stratum with too few cases gives a meaningless rate,
@@ -520,11 +578,14 @@ def check_shortcut(cases, report, threshold, min_stratum_cases):
     if single:
         print(f"INFO    per-stratum rate not computed for single-label strata {single}: a stratum "
               f"with one label scores 100% by construction, whatever the flag does")
-    test_cases = [c for c in cases if c["split"] == "test"]
-    if test_cases:
-        test_flags = Counter(c["state"]["context"]["history_complete"] for c in test_cases)
-        test_labels = Counter(c["labels"]["action"] for c in test_cases)
-        print(f"INFO    sealed test flags {dict(test_flags)} labels {dict(test_labels)}")
+    test_all = [c for c in cases if c["split"] == "test"]
+    if test_all:
+        test_flags = Counter(c["state"]["context"]["history_complete"] for c in test_all)
+        test_cases = [c for c in test_all if label_of(c) is not None]
+        test_labels = Counter(label_of(c) for c in test_cases)
+        print(f"INFO    sealed test flags {dict(test_flags)} "
+              f"labels {dict(test_labels)} "
+              f"({len(test_all) - len(test_cases)} unlabelled candidates excluded)")
 
 
 def check_placeholders(case, report):

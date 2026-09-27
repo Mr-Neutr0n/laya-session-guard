@@ -6,3 +6,6 @@ references/
 reports/remote/
 *.log
 .DS_Store
+
+# Local session collection output. Derived from private session logs, never committed.
+review_kit/draft_batch.jsonl

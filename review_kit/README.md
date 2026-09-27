@@ -130,6 +130,35 @@ only), `stratum` once you have picked the shape, `split` (ask before assigning `
 split should not be built casually), the `events` list shape, `proposed_action.kind` and
 `destination`, and `redaction`.
 
+## Collecting candidates from your own local sessions
+
+`collect_from_sessions.py` reads the local pi and codex session logs and writes candidate cases to
+`draft_batch.jsonl`. **It is local only.** No network, no upload, and nothing leaves the machine
+unless you copy it somewhere on purpose.
+
+```sh
+python3 review_kit/collect_from_sessions.py --dry-run     # counts only, writes nothing
+python3 review_kit/collect_from_sessions.py
+```
+
+A candidate is **not a labelled case and not consented data**. It records that a permission-relevant
+action was taken, with the preceding user turn as the grant context, and it carries no label and no
+annotations on purpose. Every candidate is tagged `data_origin: pending_consent` and
+`approval_state: pending_consent`, and the validator will reject one that arrives with a label, a
+consent id, or annotations.
+
+Redaction runs before anything is written. Home paths are replaced; credentials, external
+addresses, long digit runs, and IP addresses cause the candidate to be **dropped, not stored**.
+
+Before any of this is usable you need to decide two things the collector cannot:
+
+1. **Whether you approve these sessions being used at all.** That is the consent in the section
+   above, and it is per session. The draft has no `consent_id` on anything, deliberately.
+2. **Whether the candidate is a real decision point.** The collector guesses the action kind and
+   assigns a provisional stratum. Both are placeholders for you to correct.
+
+Then two independent humans label it, and only then does it stop being a candidate.
+
 ## The command you will run
 
 ```sh

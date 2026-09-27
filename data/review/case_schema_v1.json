@@ -5,7 +5,7 @@
   "description": "One case in the human-reviewed authorization dataset. Normative artifact for scripts/validate_review_set.py; the validator reads this file rather than reimplementing the rules. Cases are session states with a proposed action and a human action decision. This schema is not a model input format and does not describe the advisory session format in src/session_data.py.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "case_id", "split", "group", "stratum", "state", "labels", "provenance", "annotations", "adjudication"],
+  "required": ["schema_version", "case_id", "split", "group", "stratum", "state", "labels", "provenance"],
   "properties": {
     "schema_version": {
       "description": "Semantic version of this schema. The validator accepts only versions it implements, listed in its SUPPORTED_SCHEMA_VERSIONS.",
@@ -91,9 +91,9 @@
       }
     },
     "labels": {
-      "description": "The agreed human decision for this case. Never written by a model. Must equal the outcome of adjudication.",
-      "type": "object",
-      "additionalProperties": false,
+      "description": "The agreed human decision. A pending candidate carries no decision, so this may be null until two reviewers have labelled it. Never written by a model.",
+      "type": ["object", "null"],
+      "required": ["action", "decided_by"],
       "required": ["action", "decided_by"],
       "properties": {
         "action": {"$ref": "#/$defs/action"},
@@ -107,11 +107,15 @@
       "properties": {
         "origin": {
           "description": "llm_generated is deliberately absent. Labels must come from a human, so a case claiming model-generated ground truth cannot be expressed. synthetic_fixture is for validator tests only and is not valid dataset content.",
-          "enum": ["synthetic_fixture", "synthetic_template", "consented_session"]
+          "enum": ["synthetic_fixture", "synthetic_template", "consented_session", "pending_consent"]
         },
         "data_origin": {
           "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Required, and the validator rejects a value that disagrees with origin. It is required rather than optional because an omitted tag is indistinguishable from a forgotten one, which is exactly how synthetic material would end up unlabelled.",
-          "enum": ["synthetic", "consented"]
+          "enum": ["synthetic", "consented", "pending_consent"]
+        },
+        "approval_state": {
+          "description": "Whether the subject has approved this case for use. Required by the validator whenever origin is pending_consent, and a pending case must carry no human label. Nothing may be used until this reads approved.",
+          "enum": ["pending_consent", "approved", "withdrawn"]
         },
         "consent_id": {
           "description": "Identifier of the recorded consent covering this specific use, or null for synthetic origins. Required for consented_session.",
@@ -125,7 +129,7 @@
       }
     },
     "annotations": {
-      "description": "At least two independent human annotations. The role enum is human only, which makes an LLM-authored label unrepresentable rather than merely discouraged.",
+      "description": "At least two independent human annotations, for a case that has been reviewed. A pending candidate has none, and the validator rejects a pending case that carries any, because a machine-collected case must not arrive pre-labelled. The role enum is human only, which makes an LLM-authored label unrepresentable rather than merely discouraged.",
       "type": "array",
       "minItems": 2,
       "items": {
@@ -145,8 +149,7 @@
       }
     },
     "adjudication": {
-      "type": "object",
-      "additionalProperties": false,
+      "type": ["object", "null"],
       "required": ["status", "final", "adjudicator_id"],
       "properties": {
         "status": {

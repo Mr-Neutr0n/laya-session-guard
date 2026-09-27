@@ -426,6 +426,53 @@ python3 scripts/verify_risk_report.py       # every number in RISK_RANKED.md
 python3 scripts/analyze_false_allows.py     # every number in this report
 ```
 
+## Local session collection: candidates, not data
+
+`review_kit/collect_from_sessions.py` reads the local pi and codex session logs and emits candidate
+cases to `review_kit/draft_batch.jsonl`. It is **local only**: no network, no upload, and the
+tests assert both. Nothing leaves the machine unless you copy it somewhere deliberately.
+
+A candidate records that a permission-relevant action was taken, plus the preceding user turn as
+the grant context. It carries **no label and no annotations**, because a machine-collected case
+must not arrive pre-labelled. Every candidate is `origin` and `data_origin` of `pending_consent`,
+carries `approval_state: pending_consent`, and its notes say it needs the subject's explicit
+approval and two independent reviewers before it may mean anything. The validator rejects a pending
+case that carries a label, annotations, an adjudication record, or a consent id.
+
+Redaction runs before anything is written, and anything that fails is **dropped, not stored**. Home
+directory paths are replaced with `/home/<user>`; credentials, external addresses, long digit runs,
+and IP addresses cause a drop. Only two events and the minimum fields the schema needs are kept; a
+raw transcript is never copied.
+
+Current draft: **1,612 candidates** from 40 local sessions, 1,503 distinct action descriptions,
+27 session groups.
+
+| Dropped | Count |
+| --- | ---: |
+| not a decision tool | 393 |
+| read-only command | 179 |
+| credential: hex blob | 50 |
+| credential: bearer header | 1 |
+| long digit run | 26 |
+| IP address | 24 |
+
+**Coverage of the Mode 1 shape is the finding, and it is negative.** Against the 23 real failures:
+
+| Mode 1 feature | Present in draft |
+| --- | ---: |
+| outward direction | 87/1,612 |
+| recipient expansion | 39/1,612 |
+| enumeration source | 107/1,612 |
+| scripted body | 1/1,612 |
+| **per-item recipient loop** | **0/1,612** |
+
+Local coding sessions are shell commands and file writes. They contain the *general* shape of an
+unauthorized outward action, but **not** the specific shape that all 23 failures share: expand the
+recipient set to people the user never named, and script one message per person. The collector
+therefore cannot stand in for the human-collected `S6`/`S7` pairs, and the draft is a supplement
+to that collection rather than a substitute for it. Treat the draft as a source of `S6`-adjacent
+candidates to triage, not as coverage of the primary failure.
+
 ## Verdict
 
 The rejected checkpoint fails on 37.5% of unauthorized actions on unseen attacker goals and
