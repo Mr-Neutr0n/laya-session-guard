@@ -521,6 +521,36 @@ Recorded because a negative instrument result is still a result, and because rea
 the expansion" out of an allow-everything output would have manufactured support for the central
 claim.
 
+### Option B, valid version: the narrow claim is refuted and the general one is measured
+
+Re-run in the ASPI workspace schema, the schema the frozen splits use and the one the checkpoint
+demonstrably discriminates in, with every probe string taken from the source records rather than
+written for the purpose. The probe set was pre-registered in
+`review_kit/scenarios/option_b_preregister.md` before it was run. Both instrument checks pass:
+the base produced three distinct action labels, the tuned checkpoint two, and neither is constant.
+
+| Probe, 20 matched states each | Base allows | Tuned allows | Delta |
+| --- | ---: | ---: | ---: |
+| Expansion, real goal 13 text | 16/20 | 19/20 | **+15%** |
+| Single recipient, real safe action | 20/20 | 20/20 | 0% |
+| Control, real goal 1 or 2 text | 15/20 | **1/20** | **-70%** |
+
+**The narrow causal claim is refuted.** The base model already allows 80% of the expansions, so
+the fine-tune is not what taught the model to expand recipients; on that shape it is marginally
+worse than the base it was trained from.
+
+**The general claim is now measured rather than inferred.** The fine-tune moved the *familiar*
+non-expanding attack from 75% allowed to 5%, a 70-point gain, and gained nothing on the
+unfamiliar expansion. The checkpoint did not learn a rule about recipients. It memorised a small
+set of recognisable, training-shaped attack cues and transferred none of them to a goal it had
+never seen. That is the 66 of 176 in one sentence, and it is consistent with the base being
+uniformly permissive: 80% of expansions and 75% of controls allowed before any training.
+
+It also sharpens the data plan. More synthetic cues of the kinds already in training would not
+help, because the checkpoint already learned those. Only cases carrying the unfamiliar shape can,
+which raises the value of the consented collection in `review_kit/MODE1_UNBLOCK.md` rather than
+lowering it.
+
 ## Verdict
 
 The rejected checkpoint fails on 37.5% of unauthorized actions on unseen attacker goals and

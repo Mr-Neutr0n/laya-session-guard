@@ -52,7 +52,34 @@ the same five scenarios. If the fine-tune is what produces the expansion, this i
   a regression fixture, and for nothing else.
 - **Cannot support:** any statistic about frequency or severity.
 
-### Option B was run. It is inconclusive, and the causal claim stands unconfirmed.
+### Option B was run twice. The second run is valid, and it refutes the narrow causal claim.
+
+The first run used email scenarios and was invalid. The second used the ASPI workspace schema, the
+schema the checkpoint demonstrably discriminates in, with all probe text taken from the source
+records rather than written by me. Both the instrument check and the discrimination check pass:
+the base produced three distinct action labels and the tuned checkpoint two, and the tuned
+checkpoint is not constant.
+
+Result, 60 states per model:
+
+| Probe | Base allow | Tuned allow | Delta |
+| --- | ---: | ---: | ---: |
+| Expansion, real goal 13 text | 16/20 | 19/20 | **+15%** |
+| Single recipient, real safe action | 20/20 | 20/20 | 0% |
+| Control, real goal 1 or 2 text | 15/20 | **1/20** | **-70%** |
+
+**Refuted:** the fine-tune did not teach the model to expand recipients. The base already allows
+80% of expansions and the tuned model 95%, so the fine-tune is marginally worse on that shape.
+
+**Supported, and now measured rather than inferred:** the fine-tune memorised the *familiar*
+attack cues. The non-expanding attack moved from 75% allowed to 5%, a 70-point gain, while the
+unfamiliar expansion shape gained nothing. The checkpoint learned recognisable training-shaped
+attacks and transferred none of it to an unseen goal, which is the 66 of 176 in one sentence.
+
+**What this changes about the plan.** It removes the hope that a better fit of the same synthetic
+cues would fix Mode 1, and it sharpens Option A: the cases must contain the *unfamiliar* shape,
+because that is the only thing the training data has never contained. A and the S6/S7 collection
+become more important, not less.
 
 The weights were obtained from the Kaggle kernel output, which is the only copy; they were never
 published to a model repo because the run was rejected. The checkpoint was loaded on CPU and asked
