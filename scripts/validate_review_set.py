@@ -220,6 +220,29 @@ def check_consent(case, report):
             report.error(case_id, "consent.data_origin",
                          f"provenance.data_origin is {data_origin!r} but origin "
                          f"{provenance.get('origin')!r} implies {expected!r}")
+    manual = provenance.get("manual_review")
+    flags = provenance.get("review_flags") or []
+    if manual is None:
+        report.error(case_id, "privacy.manual_review",
+                     "provenance.manual_review is absent; every case must say whether it "
+                     "needs a human to clear it before it goes anywhere")
+    elif manual not in ("none", "privacy"):
+        report.error(case_id, "privacy.manual_review", f"manual_review {manual!r} is not recognised")
+    if flags and manual != "privacy":
+        report.error(case_id, "privacy.flag_without_marker",
+                     f"review_flags {flags} are set but manual_review is {manual!r}; a flagged "
+                     f"case must be marked for manual review so it cannot be shared silently")
+    if manual == "privacy":
+        # Flagged cases are cleared by a person, never by a machine, and never silently.
+        if case.get("labels") or case.get("annotations") or case.get("adjudication"):
+            report.error(case_id, "privacy.flagged_but_labelled",
+                         "a case flagged for privacy review carries labels; it must be cleared "
+                         "by a person before it is labelled")
+        if not case.get("split") == "dev":
+            report.warn(None, "privacy.flagged_outside_dev",
+                        f"{case_id} is flagged for privacy review but sits in "
+                        f"{case.get('split')!r}; flagged cases belong in dev until cleared")
+
     if scenario_origin:
         # A scripted rehearsal. Its grant is fictional, so it can never be a consented
         # case, and it must not arrive pre-labelled either.

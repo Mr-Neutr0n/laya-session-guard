@@ -162,6 +162,62 @@ def identity_reject_reason(text):
     return None
 
 
+# Third-party and relationship detection. These FLAG, they never drop. A relationship term is
+# a high-confidence lexical match; a capitalised name-like token is a heuristic that will also
+# fire on ordinary capitalised words, so it must not remove a case on its own. The judgement
+# whose data this is belongs to a person, not to this script.
+RELATIONSHIP_TERMS = re.compile(
+    r"\bmy\s+(?:wife|husband|partner|spouse|girlfriend|boyfriend|fiancee|"
+    r"mother|mum|mom|father|dad|parents?|sister|brother|cousin|uncle|aunt|"
+    r"son|daughter|kids?|children|niece|nephew|grandmother|grandfather|grandma|grandpa|"
+    r"in-?law|boss|manager|colleague|co-?worker|friend|neighbou?r|teammate|mentor|"
+    r"therapist|doctor|landlord|tenant|client|customer|patient|student|teacher)\b", re.I)
+# A capitalised word that is not sentence-initial-only. Deliberately noisy.
+NAME_LIKE = re.compile(r"(?<![.!?]\s)(?<!^)\b[A-Z][a-z]{2,}\b")
+# A capitalised word is only treated as a name when it sits in a slot a person would
+# occupy. Without this the flag fired on 833 of 1,337 candidates, and 810 of those were
+# ordinary technical prose: Kaggle, Laya, Benchmark, React, Vue. A flag that fires on two
+# thirds of a batch is not a screen.
+PERSON_CONTEXT = re.compile(
+    r"\b(?:to|with|from|ask|email|e-mail|mail|message|text|call|tell|ask|cc|bcc|hi|hey|"
+    r"dear|thanks|thank|for|about|regarding|and|or|but|@)\s+[A-Z][a-z]{2,}\b")
+# A capitalised token immediately after another capitalised token, as in a full name.
+NAME_PAIR = re.compile(r"\b[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}\b")
+# Words that are capitalised for reasons other than being a name.
+NAME_STOPWORDS = {
+    "The","This","That","Please","Thanks","Update","Run","Use","Check","Read","Write",
+    "Add","Remove","Delete","Install","Push","Commit","Rebase","Merge","Deploy","Build",
+    "Test","Note","Warning","Error","Failed","Cannot","Could","Would","Should","When",
+    "Where","What","Which","Who","Why","How","If","And","But","For","With","From","Then",
+    "Also","Just","Only","Now","Here","There","Monday","Tuesday","Wednesday","Thursday",
+    "Friday","Saturday","Sunday","January","February","March","April","May","June","July",
+    "August","September","October","November","December",
+    # Domain vocabulary that a coding session capitalises constantly.
+    "Kaggle","Laya","Git","GitHub","GitLab","Readme","README","API","CLI","JSON","YAML",
+    "Markdown","Python","JavaScript","TypeScript","Rust","React","Vue","Angular","Svelte",
+    "Bootstrap","Tailwind","Node","Npm","Docker","Linux","MacOS","Windows","Chrome",
+    "Safari","Firefox","Edge","Benchmark","Explore","Mode","State","Web","Developer",
+    "Designing","Kerala","School","University","Model","Data","File","Files","Path","Paths",
+    "Repo","Repository","Test","Tests","Config","Setup","Build","Release","Draft","Review",
+    "Session","Sessions","Agent","Agents","Tool","Tools","Server","Client","Provider",
+}
+
+
+def privacy_flags(text):
+    """Return review flags for third-party or relationship content. Never a drop."""
+    flags = []
+    if RELATIONSHIP_TERMS.search(text):
+        flags.append("relationship_term")
+    # Heuristic, and reported as such. A capitalised word counts as a name only in a slot a
+    # person occupies, or as part of a capitalised pair. The local account's own name is
+    # already dropped by the identity gate and must not double-count here.
+    candidates = {w for w in NAME_LIKE.findall(text) if w not in NAME_STOPWORDS}
+    candidates -= {t for t in IDENTITY_TOKENS}
+    if candidates and (PERSON_CONTEXT.search(text) or NAME_PAIR.search(text)):
+        flags.append("named_individual")
+    return flags
+
+
 MAX_TURN_CHARS = 600
 MIN_TURN_CHARS = 12
 MAX_ACTION_CHARS = 300
@@ -326,6 +382,16 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index,
             "two independent human reviewers before it may carry a label. Nothing left the "
             "machine: the mock tool writes to a local outbox."
         )
+    flags = privacy_flags(f"{task_text} {description}")
+    if flags:
+        flag_note = (" FLAGGED FOR MANUAL REVIEW (privacy): "
+                     + ", ".join(flags)
+                     + ". The stored text may name a relationship or a third party. "
+                       "That is a judgement about whose data this is, not a secret, so it is "
+                       "flagged rather than dropped. Exclude from any shared batch until a "
+                       "person clears it.")
+    else:
+        flag_note = ""
     case = {
         "schema_version": SCHEMA_VERSION,
         "case_id": case_id,
@@ -355,9 +421,12 @@ def build_candidate(session_kind, session_key, user_turn, tool, args, index,
             "approval_state": "pending_consent",
             "consent_id": None,
             "redaction": "applied",
-            "notes": provenance_notes,
+            "notes": provenance_notes + flag_note,
         },
     }
+    case["provenance"]["manual_review"] = "privacy" if flags else "none"
+    if flags:
+        case["provenance"]["review_flags"] = flags
     # decision_source only distinguishes a rehearsal from a real agent decision, so it is
     # meaningful on a scenario and absent on a real capture.
     if rehearsal:
@@ -394,6 +463,8 @@ def collect(pi_root, codex_root, max_sessions, limit, provenance="pending_consen
                                                decision_source=decision_source)
                 stats[reason] += 1
                 if case:
+                    if case["provenance"].get("review_flags"):
+                        stats["flagged_for_manual_review"] += 1
                     shapes[case["state"]["proposed_action"]["kind"]] += 1
                     kept.append(case)
                     if limit and len(kept) >= limit:
@@ -451,6 +522,8 @@ def main():
         print(f"  dropped {reason:<28} {count}", file=sys.stderr)
     identity_drops = {k: v for k, v in stats.items() if k.startswith("identity:")}
     print(f"  kept candidates                {stats['kept']}", file=sys.stderr)
+    print(f"  FLAGGED for manual review      {stats['flagged_for_manual_review']} "
+          f"(privacy; excluded from any shared batch until cleared)", file=sys.stderr)
     if identity_drops:
         print("  dropped on identity strings   ", dict(identity_drops), file=sys.stderr)
     print(f"  identity tokens in force      {IDENTITY_TOKENS}", file=sys.stderr)

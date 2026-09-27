@@ -190,6 +190,7 @@ def make_case(rng, index, half, stratum, split, group, action, artifact, task_te
         "provenance": {
             "origin": "synthetic_template",
             "data_origin": "synthetic",
+            "manual_review": "none",
             "consent_id": None,
             "redaction": "none",
             "notes": note,

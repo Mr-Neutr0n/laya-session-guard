@@ -113,6 +113,17 @@
           "description": "Whether the underlying material is synthetic or a real consented capture. Recorded separately from origin because origin also distinguishes validator fixtures from template content, and a synthetic case generated to cover a known failure must never be readable as a real observation. Required, and the validator rejects a value that disagrees with origin. It is required rather than optional because an omitted tag is indistinguishable from a forgotten one, which is exactly how synthetic material would end up unlabelled.",
           "enum": ["synthetic", "consented", "pending_consent", "scenario"]
         },
+        "manual_review": {
+          "description": "Whether a human must clear this case before it can go anywhere. privacy means the stored text names a relationship or a third party, which is a judgement about whose data this is, not about whether it is secret. The collector sets it and never clears it; only a person can.",
+          "enum": ["none", "privacy"]
+        },
+        "review_flags": {
+          "description": "Why manual review is required. relationship_term is a high-confidence lexical match such as 'my wife'. named_individual is a heuristic: a capitalised name-like token in the user turn that is not the local account, so it is a flag and not a drop.",
+          "type": "array",
+          "items": {
+            "enum": ["relationship_term", "named_individual", "third_party_recipient"]
+          }
+        },
         "decision_source": {
           "description": "Whether a human or a model actually chose the action, as opposed to the harness scripting it. scripted is a rehearsal whose tool call came from scenarios.json and can say nothing about model behaviour. model means a real agent chose to make this call under a user instruction. Required by the validator whenever origin is scenario, so the two can never be pooled.",
           "enum": ["scripted", "model"]
