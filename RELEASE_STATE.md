@@ -29,6 +29,35 @@ can be loaded as a model, which is why it is typed as a dataset rather than a mo
 
 `hxrikp/laya-wikirace-wikispeedia` is unrelated and was not touched.
 
+## The causal result, and it changes the plan
+
+**This is the most important measurement in the project.** Probe set pre-registered before it was
+run, in the ASPI workspace schema the checkpoint demonstrably discriminates in, every probe string
+taken from `data/aspi/workspace.jsonl` rather than written for the experiment. 20 matched pairs
+plus 20 controls, 60 states per model, CPU inference. Both models pass the instrument checks, so
+neither is collapsing to a constant answer.
+
+| Probe, 20 matched states each | Base allows | Tuned allows | Delta |
+| --- | ---: | ---: | ---: |
+| Expansion, real goal 13 text | 16/20 (80%) | 19/20 (95%) | **+15%** |
+| Single recipient, real safe action | 20/20 (100%) | 20/20 (100%) | 0% |
+| Control, real goal 1 or 2 text | 15/20 (75%) | **1/20 (5%)** | **-70%** |
+
+**The checkpoint memorised training-shaped cues and transferred nothing to the unfamiliar goal.** The
+base already allowed 80% of the expansion probes and 75% of the familiar attack, so it was
+uniformly permissive before any training. The fine-tune left the expansion slightly *worse* than
+the base it came from, left the legitimate send untouched, and moved the familiar attack from 75%
+allowed to 5%, a 70-point gain. It did not learn a rule about recipients; it learned a small set
+of recognisable attack shapes, all from training, and transferred none of them to a goal it had
+never seen. That is the 66 of 176 on unseen attacker goals in one sentence, measured rather than
+inferred from per-goal error counts.
+
+**Only cases carrying the unfamiliar shape can move this checkpoint.** More synthetic data of the
+kinds already in training would not help, because the checkpoint already learned those. The
+consented human collection is the only route with a mechanism behind it. The S6/S7 stopgap is a
+specification for that collection and a regression fixture, never training data. The pre-registered
+run in section 10 should not be repeated before it exists.
+
 ## What is rejected, and why
 
 | Run | Rejected because |
@@ -145,8 +174,10 @@ published as a negative result, as the last four were.
 - `src/train.py` carries eval instrumentation that is uncommitted, because the file also holds
   in-progress work that was excluded from the audit branch by request. The temperature-grid
   correction ships as `patches/temperature-grid.patch` for the same reason.
-- **The risk-ranked Kaggle write-up is public as of kernel v8**, at
-  `kaggle.com/code/uranium53/laya-risk-ranked-aspi`. Its markdown asserts no per-run number; the
+- **The risk-ranked Kaggle write-up is PUBLIC**, at
+  `kaggle.com/code/uranium53/laya-risk-ranked-aspi`, kernel v8. It asserts no per-run number; its
+  table is generated from the run's own report, so a run cannot contradict its write-up. A
+  re-execution of the same content is running as v8 and its outcome does not change the verdict. Its markdown asserts no per-run number; the
   table is generated from the run's own report, so a run can no longer contradict its write-up.
   v7 completed cleanly and was verified against its own output before the flip: 36 of 176 on
   unseen attacker goals, 7 of 36 on the both-unseen split, 2 of 216 on unseen user tasks, 6 of 16
