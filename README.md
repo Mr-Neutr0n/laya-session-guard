@@ -87,6 +87,11 @@ partial-schedule artefact, not a converged run. See
 and rerun the tables from the stored logits with
 `.venv/bin/python src/router_recompute.py reports/router_results.json`.
 
+Published artefacts:
+
+- [Hugging Face checkpoint and model card](https://huggingface.co/hxrikp/laya-arxiv-topic-router)
+- [Kaggle results notebook](https://www.kaggle.com/code/uranium53/laya-arxiv-router-base-vs-fine-tuned)
+
 ## Reproduce
 
 ```sh
