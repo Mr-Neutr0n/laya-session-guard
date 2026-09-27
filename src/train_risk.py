@@ -1,6 +1,11 @@
 """Risk-weighted and pair-ranked Laya fine-tune on a Kaggle GPU."""
 import os
-os.environ.update(USE_TF="0", USE_FLAX="0", TOKENIZERS_PARALLELISM="false")
+os.environ.update(USE_TF="0", USE_FLAX="0", TOKENIZER_PARALLELISM="false",
+                  TOKENIZERS_PARALLELISM="false")
+# Must be set before CUDA initialises or cuBLAS picks its workspace config, otherwise
+# the cuBLAS reductions this run depends on are not reproducible. See the determinism
+# block in main() for what is and is not guaranteed.
+os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
 import importlib.metadata
 import json
 import math
@@ -114,6 +119,29 @@ def choose_key(summary):
 
 def main():
     random.seed(42); np.random.seed(42); torch.manual_seed(42)
+    # Reproducibility. Two runs of this script with the same seed and the same data
+    # produced different per-case decisions, and different calibration accuracy at
+    # epoch 1, because the seeds alone do not pin GPU kernel selection. The flags below
+    # are what make a rerun comparable.
+    #
+    # What is now guaranteed: the same seed reproduces the same weights on the same
+    # GPU, driver, and library stack, and a rerun is comparable run over run.
+    #
+    # What is NOT guaranteed, and must be read as a caveat rather than a guarantee:
+    #   - bit-identical results across different GPU architectures, driver versions, or
+    #     torch builds, since kernels differ;
+    #   - that warn_only=True has no warnings, which is why it is logged below. Ops with
+    #     no deterministic implementation fall back to a nondeterministic kernel and
+    #     announce themselves;
+    #   - fp16 autocast itself. Deterministic algorithms make each op's *algorithm*
+    #     deterministic, but reduced-precision accumulation order can still depend on the
+    #     kernel, so fp16 remains the weakest link in the chain.
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False  # benchmark picks kernels by timing, so it is
+                                             # nondeterministic by construction
+    torch.backends.cuda.matmul.allow_tf32 = False
+    torch.backends.cudnn.allow_tf32 = False
     torch.set_num_threads(4)
     assert torch.cuda.is_available(), "Kaggle GPU required"
     device = torch.device("cuda:0")
@@ -233,6 +261,20 @@ def main():
               "split_sizes": {k: len(v) for k, v in splits.items()},
               "history": history, "baseline": baseline, "finetuned": final,
               "temperatures": temperatures,
+              "determinism": {
+                  "seed": 42,
+                  "use_deterministic_algorithms": True,
+                  "deterministic_algorithms_warn_only": True,
+                  "cudnn_deterministic": True,
+                  "cudnn_benchmark": False,
+                  "tf32": False,
+                  "cublas_workspace_config": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
+                  "amp_dtype": "float16",
+                  "caveat": ("Bit-identical only on the same GPU, driver, and library stack. "
+                             "warn_only means any op without a deterministic implementation "
+                             "falls back silently apart from a warning, and fp16 accumulation "
+                             "order can still depend on the kernel."),
+              },
               "per_case_rows": {name: str(rows_path(OUT, name))
                                 for name in ("calibration", "test_user", "test_attack",
                                              "test_both", "old_challenge")},

@@ -70,13 +70,27 @@ class EvaluationLoopTests(unittest.TestCase):
 class ReproducibilityTests(unittest.TestCase):
     """The pipeline is seeded but not bit-reproducible. Pin the observation."""
 
-    def test_no_deterministic_algorithms_flag_is_set(self):
-        """The reason it is not reproducible, stated rather than implied."""
+    def test_determinism_flags_are_set(self):
+        """Set because two same-seed runs diverged. Assert the fix, not the absence."""
         source = TRAIN_RISK.read_text()
-        self.assertNotIn("use_deterministic_algorithms", source)
-        self.assertNotIn("cudnn.deterministic", source)
+        self.assertIn("torch.use_deterministic_algorithms(True, warn_only=True)", source)
+        self.assertIn("torch.backends.cudnn.deterministic = True", source)
+        self.assertIn("torch.backends.cudnn.benchmark = False", source)
+        self.assertIn("CUBLAS_WORKSPACE_CONFIG", source,
+                      "cuBLAS workspace config must be set before CUDA initialises")
         for seed in ("random.seed(42)", "np.random.seed(42)", "torch.manual_seed(42)"):
             self.assertIn(seed, source, "seeding must stay explicit")
+
+    def test_determinism_caveats_are_documented_not_oversold(self):
+        """Determinism is not bit-identity across stacks, and the code must say so."""
+        source = TRAIN_RISK.read_text()
+        for caveat in ("warn_only", "fp16", "same GPU, driver"):
+            self.assertIn(caveat, source, f"caveat missing: {caveat}")
+
+    def test_run_records_its_determinism_configuration(self):
+        source = TRAIN_RISK.read_text()
+        self.assertIn('"determinism": {', source)
+        self.assertIn('"caveat"', source)
 
     def test_seed_is_still_42(self):
         self.assertIn("torch.manual_seed(42)", TRAIN_RISK.read_text())
