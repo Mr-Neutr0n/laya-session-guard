@@ -10,8 +10,9 @@ from transformers import AutoTokenizer
 from huggingface_hub import snapshot_download
 from laya.common import build_model
 from laya.agent import _fix_tokenizer_config
-from session_data import generate, QUESTIONS
+from session_data import generate as original_generate, QUESTIONS
 from context import checked_sequence
+from eval_rows import rows_from_predictions, rows_path, write_rows
 
 REVISION = "1c5edc17a7acd8701df6fc341c0d179f1c62c982"
 OUT = Path(os.environ.get("OUTPUT_DIR", "/kaggle/working/laya-session-guard"))
@@ -96,7 +97,15 @@ def main():
     cfg = json.loads(Path(model_dir,"rl_agent_config.json").read_text())
     cfg.update(max_len=1024, head_max_len=192, amp_dtype="fp16", temperature=[1.,1.,1.],temperature_by_options={})
     tok = AutoTokenizer.from_pretrained(Path(model_dir,"tokenizer"))
-    splits = generate(); prepared = {}
+    data_variant = os.environ.get("DATA_VARIANT", "original")
+    if data_variant == "original":
+        splits = original_generate()
+    elif data_variant == "counterfactual":
+        from counterfactual_data import generate as counterfactual_generate
+        splits = counterfactual_generate()
+    else:
+        raise ValueError(f"Unknown data variant: {data_variant}")
+    prepared = {}
     for name, records in splits.items():
         prepared[name] = []
         with (OUT / f"{name}.jsonl").open("w") as f:
@@ -122,7 +131,7 @@ def main():
     enc = [p for n,p in model.named_parameters() if n.startswith("encoder.") and p.requires_grad]
     head = [p for n,p in model.named_parameters() if not n.startswith("encoder.") and p.requires_grad]
     opt = torch.optim.AdamW([{"params":enc,"lr":2e-5},{"params":head,"lr":5e-5}],weight_decay=.01)
-    epochs, batch_size, accum = 3, 4, 4
+    epochs, batch_size, accum = int(os.environ.get("TRAIN_EPOCHS", "3")), 4, 4
     steps_per_epoch = math.ceil(len(prepared["train"])/batch_size)
     updates = epochs * math.ceil(steps_per_epoch/accum)
     sched = torch.optim.lr_scheduler.LambdaLR(opt,lambda s: min((s+1)/max(1,int(updates*.06)), max(0.,(updates-s)/max(1,updates-int(updates*.06)))))
@@ -154,16 +163,25 @@ def main():
     test=evaluate(model,prepared["test"],tok,device)
     # Both questions are choice, but have different option counts and calibration buckets.
     cfg["temperature_by_options"]={"choice:2":temperatures["content"],"choice:3-5":temperatures["action"]}
-    cfg["fine_tuned"]=True; cfg["model_name"]="laya-session-guard-synthetic-pilot"
+    cfg["fine_tuned"]=True; cfg["model_name"]=f"laya-session-guard-{data_variant}-{epochs}ep"
     (OUT/"rl_agent_config.json").write_text(json.dumps(cfg,indent=2))
     report={"status":"completed","synthetic_only":True,"seed":42,"model_revision":REVISION,
+        "data_variant":data_variant,"epochs":epochs,
         "gpu":torch.cuda.get_device_name(0),"training_seconds":time.time()-started,"history":history,
         "split_sizes":{k:len(v) for k,v in splits.items()},"temperatures":temperatures,
         "baseline_temperatures":base_temp,"baseline":metrics(baseline,base_temp),
         "finetuned":metrics(test,temperatures),"finetuned_uncalibrated":metrics(test,{k:1. for k in QUESTIONS}),
+        "per_case_rows":{n:str(rows_path(OUT,n)) for n in ("calibration_base","calibration","test")},
         "limitations":["Synthetic template labels; no real session validation","English only","No production authorization claim","Single seed","Long sessions require review when partitioned"]}
     (OUT/"report.json").write_text(json.dumps(report,indent=2))
     (OUT/"predictions.json").write_text(json.dumps({"base":baseline,"finetuned":test},indent=2))
+    # Per-case rows for the base and fine-tuned models, calibration included, so a wrapper
+    # threshold can be fitted without reading the splits it is then scored on.
+    for name,preds,who in (("calibration_base",baseline_cal,"base"),
+                           ("calibration",calibration,"finetuned"),
+                           ("test",test,"finetuned")):
+        path=write_rows(rows_path(OUT,name),rows_from_predictions(preds,name,model=who))
+        print("ROWS",name,len(preds)//len(QUESTIONS),path,flush=True)
     (OUT/"questions.json").write_text(json.dumps(QUESTIONS,indent=2))
     import importlib.metadata
     (OUT/"versions.json").write_text(json.dumps({k:importlib.metadata.version(k) for k in ["torch","laya","transformers","safetensors","huggingface_hub"]},indent=2))
